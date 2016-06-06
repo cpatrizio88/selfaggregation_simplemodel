@@ -31,7 +31,7 @@ x = np.linspace(0, d, 1e7)
 #T_BL = 301 #boundary layer temperature
 eps_BL = 0.5 #emissivity of boundary layer
 
-S0 = 413.98 #solar constant
+S0 = 650.83 #solar constant
 theta = 50.5 #zenith angle 
 S = np.cos((theta*np.pi/180))*S0 
 
@@ -206,7 +206,6 @@ for i, T_s in enumerate(fs):
     SPW = integrate.quad(SPW_fn, p_t, p_BL)[0] + (1./(g*rho_w))*wsat(T_BL, (p_BL + p_s)/2.)*p_BL
     
     CRH = PW/SPW
-    
     
     print 'T_s = {0}'.format(T_s)
     print 'check moisture balance:'

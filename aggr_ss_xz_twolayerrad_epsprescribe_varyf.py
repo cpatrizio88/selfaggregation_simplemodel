@@ -182,6 +182,7 @@ for i, f in enumerate(fs):
     hit = q_BL >= q_BLm
     
     hit_indices = np.where(hit)[0]
+    moistedge_index = hit_indices[0]
     
     l_d = x[hit_indices[0]]
     
@@ -190,6 +191,15 @@ for i, f in enumerate(fs):
     l_m = -(l_d*W_d*c.cpd*M_trop + lv*E)/(W_m*c.cpd*M_trop)
     
     P = -(omega_m/g)*l_m*delq_m
+    
+    #column relative humidity calculation
+    PW = (1./(g*rho_w))*(p_BL*q_BL[1:moistedge_index] + (p_BL - p_t)*q_FA)
+    
+    #saturation precipitable water
+    SPW_fn = lambda p: (1./(g*rho_w)*wsat(findT(T_s, p), p))
+    SPW = integrate.quad(SPW_fn, p_t, p_BL)[0] + (1./(g*rho_w))*wsat(T_BL, (p_BL + p_s)/2.)*p_BL
+    
+    CRH = PW/SPW
     
     print 'f = {0}'.format(f)
     print 'check moisture balance:'
