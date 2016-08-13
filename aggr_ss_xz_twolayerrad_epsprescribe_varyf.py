@@ -17,6 +17,8 @@ import thermo
 
 matplotlib.style.use('ggplot')
 
+fout = '/Users/cpatrizio/figures/simplemodel'
+
 sig = 5.67e-8
 lv = 2.257e6
 g = 9.81
@@ -41,7 +43,7 @@ p_BL = 950e2 #boundary layer top (Pa)
 delp_BL = p_s - p_BL #thickness of boundary layer (Pa)
 
 
-fs = np.linspace(0.80, 0.95, 200)
+fs = np.linspace(0.85, 0.93, 30)
 
 #for f in fs:
 #    p_lcl, T_lcl = findLCL0(f*q_sat, p_s, T_BL)
@@ -68,7 +70,11 @@ o_unbalance = np.zeros(fs.shape)
 
 Ebalance_err = np.zeros(fs.shape)
 
-T_s = 310
+
+delss = np.zeros(fs.shape)
+delq_ms = np.zeros(fs.shape)
+
+T_s = 302
 
 #the following is the temperature profile used in Pierrehumbert 1995 
 #It is a very accurate approximation to a RCE profile in the tropics.
@@ -99,6 +105,8 @@ for i, f in enumerate(fs):
     q_BLsat = wsat(T_BL, (p_s + p_BL)/2.)
     q_BLtopsat = wsat(T_BLtop, p_BL)
     
+    #p_lcl, T_lcl = findLCL0(f*q_sat, p_s, T_BL)
+    
     M_trop = (p_BL - p_t)/g #mass of troposphere in kg m^-2
     M_BL = (p_s - p_BL)/g #mass of boundary layer in kg m^-2
             
@@ -111,8 +119,6 @@ for i, f in enumerate(fs):
     q_FA = wsat(T_t, p_t) #free troposphere water vapor mixing ratio
     #q_FA = 0.001
     T_c = T_t #cloud top temperature
-        
-    
         
     thickness = lambda p: (c.Rd/(p*g))*findT(T_s, p)
     delz_trop = integrate.quad(thickness, p_t, p_BL)[0]
@@ -169,8 +175,6 @@ for i, f in enumerate(fs):
     
     q_BLm = f*q_sat #moisture in moist region
 
-
-    
     #difference in moisture between lifting condensation level and tropopause 
     delq_m = q_BLm - q_FA
     
@@ -178,22 +182,41 @@ for i, f in enumerate(fs):
     omega_m = (g*W_m*c.cpd*M_trop)/(dels_trop + lv*delq_m)
     w_m = omega_m/(-rho_BL*g)
     
-    #find where q_BL == f*q_sat
-    hit = q_BL >= q_BLm
+    moistedge_index = np.where(q_BL >= q_BLm)[0][0]
     
-    hit_indices = np.where(hit)[0]
-    moistedge_index = hit_indices[0]
+    l_d = x[moistedge_index]
     
-    l_d = x[hit_indices[0]]
+    qBL_bar = np.mean(q_BL[1:moistedge_index])
+    
+    l_d = x[moistedge_index]
     
     E = ((omega_BL*delq)/g)*(l_d + L_m*(np.exp(-l_d/L_m) - 1))
     
-    l_m = -(l_d*W_d*c.cpd*M_trop + lv*E)/(W_m*c.cpd*M_trop)
+
+    
+    #l_m = -(l_d*W_d*c.cpd*M_trop + lv*E)/(W_m*c.cpd*M_trop)
+    l_m = -(omega_BL*l_d)/omega_m
+    
+    L = l_m + l_d
+    
+    moistend_index = np.where(x >= L)[0][0]
+    
+    q_BL = q_BL[1:moistend_index]
+    q_BL[moistedge_index:moistend_index] = q_BLm
+    
+    
+    u_BL = u_BL[:moistend_index]
+    u_BL[moistedge_index:moistend_index] = omega_m*(x[moistedge_index:moistend_index] - L)/delp_BL
+    
+    LHF = c.lv0*rho_BL*c_E*u_BL*(q_sat - q_BL)
+    SHF = c.cp*rho_BL*c_E*(T_s - T_BL)
+    
+    qBL_bar = np.mean(q_BL[1:moistend_index])
     
     P = -(omega_m/g)*l_m*delq_m
     
     #column relative humidity calculation
-    PW = (1./(g*rho_w))*(p_BL*q_BL[1:moistedge_index] + (p_BL - p_t)*q_FA)
+    PW = (1./(g*rho_w))*(p_BL*q_BL + (p_BL - p_t)*q_FA)
     
     #saturation precipitable water
     SPW_fn = lambda p: (1./(g*rho_w)*wsat(findT(T_s, p), p))
@@ -202,9 +225,14 @@ for i, f in enumerate(fs):
     CRH = PW/SPW
     
     print 'f = {0}'.format(f)
+    print 'RH in moist region BL = {0}'.format(q_BLm/q_BLsat)
+    print 'T_s = {0}'.format(T_s)
     print 'check moisture balance:'
     print 'E = {0} (kg s^-1 m^-1)'.format(E)
+    print 'P/(rho_w*l_m) = {0} (mm/day)'.format(P/(rho_w*l_m)*(1e3/(3600*24)))
     print 'P = {0} (kg s^-1 m^-1)'.format(P)
+    print 'qBL_Bar = {0}, q_FA = {1}'.format(qBL_bar, q_FA)
+    print 'qsat = {0}'.format(q_sat)
     print 'error = {0}', np.abs(E-P)/P
     print ''
     print 'check mass balance:'
@@ -212,6 +240,10 @@ for i, f in enumerate(fs):
     massup = -omega_m*l_m
     print 'omega_BL * l_d = {0} (Pa m s^-1) '.format(massdown)
     print 'omega_m * l_m = {0} (Pa m s^-1)'.format(massup)
+    print 'w_BL = {0} m s^-1'.format(w_BL*M_trop)
+    print 'w_m = {0} m s^-1'.format(w_m*M_trop)
+    print 'l_m/l_d = {0}'.format(l_m/l_d)
+    print 'M_BL = {0} kg/m^2, M_trop = {1} kg/m^2'.format(M_BL, M_trop)
     print 'error = {0}'.format(np.abs((massdown - massup)/massdown))
     print ''
     evap_cool = lv*E
@@ -227,15 +259,15 @@ for i, f in enumerate(fs):
     print 'troposphere radiative cooling plus evaporative cooling in dry region = {0} (J m^-1 s^-1)'.format(dry_cooling)
     print 'moist radiative warming = {0} (J m^-1 s^-1)'.format(moist_warming)
     print 'error = {0}'.format(np.abs((moist_warming - dry_cooling)/dry_cooling))
+    print 'T_a = {0} (K)', T_a
     Ebalance_err[i] = np.abs((dry_cooling - moist_warming)/dry_cooling)
     #print 'radiative cooling in dry region + BL = {0} (J m^-1 s^-1)'.format(dry_cooling)
     #print 'radiative warming in moist region {0} (J m^-1 s^-1)'.format(moist_warming)
     #print 'error = {0}'.format(np.abs((dry_cooling - moist_warming)/dry_cooling))
     print '------------------'
+
     
-    L = l_m + l_d
-    
-    hit_m = np.bitwise_and(x > l_d, x < L)
+    #hit_m = np.bitwise_and(x > l_d, x < L)
     
     omega_ms[i] = omega_m
     omega_BLs[i] = omega_BL
@@ -250,6 +282,8 @@ for i, f in enumerate(fs):
     W_os[i] = W_o
     W_BLs[i] = W_BL
     q_BLms[i] = q_BLm
+    delss[i] = dels_trop
+    delq_ms[i] = delq_m
     Es[i] = E
 
 hit = q_BLms < q_BLtopsat 
@@ -327,93 +361,112 @@ plt.suptitle('T_s = {} K, BL top = {} hPa, delz_BL_BL = {:4.1f} m., eps_BL = {},
 plt.legend()
 plt.draw()
 plt.show()
-fig.savefig('fig1_lengths.pdf')
+fig.savefig(fout + 'fig1_lengthsvRH.pdf')
 plt.close()
 
-
-
-plt.figure(2)
-fig, axarr = plt.subplots(3, 1, figsize=(12,9))
-#axarr[0,].plot(RH, p_lcls/100.)
+#
+#plt.figure(2)
+#fig, axarr = plt.subplots(3, 1, figsize=(12,9))
+##axarr[0,].plot(RH, p_lcls/100.)
+##axarr[0,].set_xlabel('RH')
+##axarr[0,].set_ylabel('p_lcl')
+##axarr[0,0].axvline(x = omega_m_switch, color='g')
+##axarr[0,0].axvline(x = RH_cutoff, color='r')
+#
+#o_warmings = np.multiply(l_ds, cpw*W_os*M_o)
+#drytrop_coolings = np.multiply(l_ds, c.cpd*W_ds*M_trop)
+#dryBL_coolings = np.multiply(l_ds, c.cpd*W_BLs*M_BL)
+#E_coolings = lv*Es
+#moist_warmings = np.multiply(l_ms, c.cpd*W_ms*M_trop)
+##    
+##plt.figure(6)
+#axarr[0,].plot(RH, E_coolings, 'b', label='E cooling')
+#axarr[0,].plot(RH, drytrop_coolings, 'r', label='dry trop. rad. cooling')
+#axarr[0,].plot(RH, moist_warmings, 'g', label='moist rad. warming')
+#axarr[0,].axvline(x = p_BLeqLCL, color='k', label='p_LCL = p_BL')
+##axarr[1,0].axvline(x = omega_m_switch, color='g')
+##axarr[1,0].axvline(x = RH_cutoff, color='r')
 #axarr[0,].set_xlabel('RH')
-#axarr[0,].set_ylabel('p_lcl')
-#axarr[0,0].axvline(x = omega_m_switch, color='g')
-#axarr[0,0].axvline(x = RH_cutoff, color='r')
-
-o_warmings = np.multiply(l_ds, cpw*W_os*M_o)
-drytrop_coolings = np.multiply(l_ds, c.cpd*W_ds*M_trop)
-dryBL_coolings = np.multiply(l_ds, c.cpd*W_BLs*M_BL)
-E_coolings = lv*Es
-moist_warmings = np.multiply(l_ms, c.cpd*W_ms*M_trop)
-#    
-#plt.figure(6)
-axarr[0,].plot(RH, E_coolings, 'b', label='E cooling')
-axarr[0,].plot(RH, drytrop_coolings, 'r', label='dry trop. rad. cooling')
-axarr[0,].plot(RH, moist_warmings, 'g', label='moist rad. warming')
-axarr[0,].axvline(x = p_BLeqLCL, color='k', label='p_LCL = p_BL')
-#axarr[1,0].axvline(x = omega_m_switch, color='g')
-#axarr[1,0].axvline(x = RH_cutoff, color='r')
-axarr[0,].set_xlabel('RH')
-axarr[0,].set_ylabel('heating/cooling (J s^-1 m^-1)')
-#plt.show()
-
-net_warmingerror = moist_warmings - drytrop_coolings - E_coolings
-net_oceanwarming = np.divide(o_unbalance/(cpw*M_o), l_ds)
-
-#plt.figure(7)
-axarr[1,].plot(RH, net_oceanwarming*(3600*24))
-axarr[1,].set_xlabel('RH')
-axarr[1,].set_ylabel('rad ocean_warming - evap_cooling (K day^-1)')
-axarr[1,].axvline(x = p_BLeqLCL, color='k', label='p_LCL = p_BL')
-#plt.show()
-
-#plt.figure(8)
-axarr[2,].plot(RH, W_ms*(3600*24), label='W_m', color ='g')
-axarr[2,].plot(RH, W_ds*(3600*24), label='W_d', color = 'r')
-axarr[2,].plot(RH, W_BLs*(3600*24), label='W_BL', color = 'y')
-axarr[2,].plot(RH, W_os*(3600*24), label='W_o', color='b')
-axarr[2,].axvline(x = p_BLeqLCL, color='k', label='p_LCL = p_BL')
-axarr[2,].set_ylabel('radiative warming (K day^-1)')
-axarr[2,].set_xlabel('RH')
-plt.suptitle('T_s = {} K, BL top = {} hPa, delz_BL_BL = {:4.1f} m., eps_BL = {}, latent heat exchange coeff. = {}'.format(T_s, p_BL/100., delz_BL, eps_BL, c_E))
-plt.legend()
-plt.show()
-fig.savefig('fig2_radiation.pdf')
-plt.close()
+#axarr[0,].set_ylabel('heating/cooling (J s^-1 m^-1)')
 ##plt.show()
 #
-#plt.figure(9)
-
-plt.figure(3, figsize=(12,9))
-plt.plot(RH, net_warmingerror)
-plt.axvline(x = RHomega_mmin, color='k', alpha=0.4, label='max w_m')
-plt.ylabel('moist rad. warming - dry trop. rad cooling - E_cooling (J s^-1 m^-1)')
-plt.xlabel('RH')
-plt.legend()
-plt.savefig('fig3_netraderror.pdf')
-plt.show()
-plt.close()
-
-plt.figure(4, figsize=(12,9))
-plt.plot(RH, Ebalance_err)
-#plt.axvline(x = RH_cutoff, color='r')
-plt.axvline(x = p_BLeqLCL, color='k', label='p_LCL = p_BL')
-plt.ylabel('energy balance fractional error: (moist warming - dry_trop_cooling - evap_cooling)/total cooling')
-plt.xlabel('RH')
-plt.legend()
-plt.savefig('fig4_fracraderror.pdf')
-plt.show()
-plt.close()
+#net_warmingerror = moist_warmings - drytrop_coolings - E_coolings
+#net_oceanwarming = np.divide(o_unbalance/(cpw*M_o), l_ds)
+#
+##plt.figure(7)
+#axarr[1,].plot(RH, net_oceanwarming*(3600*24))
+#axarr[1,].set_xlabel('RH')
+#axarr[1,].set_ylabel('rad ocean_warming - evap_cooling (K day^-1)')
+#axarr[1,].axvline(x = p_BLeqLCL, color='k', label='p_LCL = p_BL')
+##plt.show()
+#
+##plt.figure(8)
+#axarr[2,].plot(RH, W_ms*(3600*24), label='W_m', color ='g')
+#axarr[2,].plot(RH, W_ds*(3600*24), label='W_d', color = 'r')
+#axarr[2,].plot(RH, W_BLs*(3600*24), label='W_BL', color = 'y')
+#axarr[2,].plot(RH, W_os*(3600*24), label='W_o', color='b')
+#axarr[2,].axvline(x = p_BLeqLCL, color='k', label='p_LCL = p_BL')
+#axarr[2,].set_ylabel('radiative warming (K day^-1)')
+#axarr[2,].set_xlabel('RH')
+#plt.suptitle('T_s = {} K, BL top = {} hPa, delz_BL_BL = {:4.1f} m., eps_BL = {}, latent heat exchange coeff. = {}'.format(T_s, p_BL/100., delz_BL, eps_BL, c_E))
+#plt.legend()
+#plt.show()
+#fig.savefig('fig2_radiation.pdf')
+#plt.close()
+###plt.show()
+##
+##plt.figure(9)
+#
+#plt.figure(3, figsize=(12,9))
+#plt.plot(RH, net_warmingerror)
+#plt.axvline(x = RHomega_mmin, color='k', alpha=0.4, label='max w_m')
+#plt.ylabel('moist rad. warming - dry trop. rad cooling - E_cooling (J s^-1 m^-1)')
+#plt.xlabel('RH')
+#plt.legend()
+#plt.savefig('fig3_netraderror.pdf')
+#plt.show()
+#plt.close()
+#
+#plt.figure(4, figsize=(12,9))
+#plt.plot(RH, Ebalance_err)
+##plt.axvline(x = RH_cutoff, color='r')
+#plt.axvline(x = p_BLeqLCL, color='k', label='p_LCL = p_BL')
+#plt.ylabel('energy balance fractional error: (moist warming - dry_trop_cooling - evap_cooling)/total cooling')
+#plt.xlabel('RH')
+#plt.legend()
+#plt.savefig('fig4_fracraderror.pdf')
+#plt.show()
+#plt.close()
 
 plt.figure(5, figsize=(12,9))
 plt.plot(fvals, RH)
 plt.axvline(x = fs[omega_mminindex], color='k', alpha=0.4, label='max w_m')
-plt.ylabel('RH')
+plt.ylabel('RH in moist region BL')
 plt.xlabel('f')
 plt.legend()
 plt.show()
-plt.savefig('fig5_fvsRH.pdf')
+plt.savefig(fout + 'fig5_fvsRH.pdf')
 plt.close()
+
+hit = np.where(lv*delq_ms + delss > 0)[0][0]
+
+fig = plt.figure(6, figsize=(12,9))
+plt.title('dels_trop + lv*delq_m = MSE difference between boundary layer top and tropopause')
+plt.plot(RH, -delss, color='r', label='-dels_trop')
+plt.plot(RH, lv*delq_ms, color='b', label='lv*delq_m')
+plt.axvline(x = RH[hit], color='k')
+plt.ylabel('energy (J)')
+plt.text(RH[hit] + 0.05, 55000, 'dh/dz > 0')
+plt.text(RH[hit] - 0.03, 55000, 'dh/dz < 0')
+plt.xlabel('RH')
+plt.legend()
+plt.suptitle('f = {} , BL top = {} hPa, delz_BL = {:4.1f} m., eps_BL = {}, latent heat exchange coeff. = {}'.format(f, p_BL/100., delz_BL, eps_BL, c_E))
+fig.savefig(fout + 'moistregionMSEdifference_vRH.pdf')
+plt.show()
+plt.close()
+
+
+
 
 
 
