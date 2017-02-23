@@ -97,7 +97,7 @@ def findT(T_s, p):
 for i, f in enumerate(fs):
     
     q_sat = wsat(T_s, p_s) #mixing ratio above sea surface (100% saturated)
-    thetae0 = thermo.theta_e(p_s, T_s, q_sat, 0) #theta_e in moist region 
+    thetae0 = thermo.theta_e(T_s, p_s, q_sat, 0) #theta_e in moist region 
                                                         #use surface temperature to get moist adiabat
     T_t = findT(T_s, p_t) #temperature of tropopause (outflow region)
     T_BLtop = findT(T_s, p_BL) #temperature of boundary layer top 
