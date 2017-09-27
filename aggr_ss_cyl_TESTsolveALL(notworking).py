@@ -56,7 +56,7 @@ T_s = 302
 L_v = 2.257*1e6
 
 #eps_a = 1
-eps_strat = 0.1
+eps_strat = 0
 #eps_BL = 0.6
 
 #S0 = 413.98 #solar constant
@@ -118,6 +118,102 @@ massbalance = np.zeros(eps_BLss.shape)
 p_LCLs = np.zeros(eps_BLss.shape)
 
 l_d = 3000e3
+
+#T_a = np.mean(Tadb)
+#T_out = findTmoist(thetae0, p_out)
+T_out = findT(T_s, p_out)
+T_strat = T_out
+#T_strat = np.mean(findTmoist(thetae0, np.linspace(95,p_out,50)))
+#rho_BL = p_s/(c.Rd*T_BL)
+s_surf = c.cpd*T_s #dry static energy at surface
+
+q_FA = wsat(T_out, p_out)
+
+                                                    
+def T_BLfn(p_BL):
+    #T_BLtop = findTmoist(thetae0, p_BL) #temperature of boundary layer top 
+    T_BLtop = findT(T_s, p_BL)
+    T_BL = np.add(T_s, T_BLtop)/2. #temperature of boundary layer, consistent with well-mixed assumption (linear mixing)
+    return T_BL
+    
+def T_afn(p_BL):
+    T_a = np.mean(findT(T_s, np.linspace(p_out, p_BL, 50)))
+    return T_a
+    
+def dels_tropfn(p_BL):
+    T_BLtop = findT(T_s, p_BL) #temperature of boundary layer top 
+    thickness = lambda p: (c.Rd/(p*g))*findT(T_s, p)
+    delz_trop = integrate.quad(thickness, p_out, p_BL)[0]
+    #delz_trop = np.zeros(len(p_BL))
+    #for i,p_BLe in enumerate(p_BL):
+    #    delz_trop[i] = integrate.quad(thickness, p_out, p_BLe)[0]
+    dels_trop = c.cpd*np.subtract(T_BLtop, T_out) + g*(-delz_trop) #difference in dry static energy between boundary layer top and tropopause (J)
+    return dels_trop
+    
+def dels_BLfn(p_BL): 
+    T_BLtop = findT(T_s, p_BL) #temperature of boundary layer top 
+    rho_BLtop = p_BL/np.multiply(c.Rd, T_BLtop)
+    rho_s = p_s/(c.Rd*T_s)
+    rho_BL = (rho_BLtop + rho_s)/2.
+    delz_BL = np.subtract(p_s, p_BL)/(g*rho_BL)
+    s_BLtop = c.cpd*np.array(T_BLtop) + g*np.array(delz_BL) #dry static energy at top of boundary layer
+    s_BL = np.add(s_BLtop,s_surf)/2. #dry static energy of BL (well-mixed)
+    dels_BL = np.subtract(s_BL, s_BLtop) #difference in dry static energy between BL and right above BL
+    return dels_BL
+    
+
+def equations(p):
+    l_m, RH_m, p_BL = p
+    
+    T_a = T_afn(p_BL)
+    #T_BLs[i,j] = T_BL
+            
+    T_BLtop = findT(T_s, p_BL) #temperature of boundary layer top 
+    T_BL = T_BLfn(p_BL)
+    rho_BLtop = p_BL/(c.Rd*T_BLtop)
+    
+    rho_BLtop = p_BL/np.multiply(c.Rd, T_BLtop)
+    rho_s = p_s/(c.Rd*T_s)
+    rho_BL = (rho_BLtop + rho_s)/2.
+
+    dels_BL = dels_BLfn(p_BL)
+    dels_trop = dels_tropfn(p_BL)
+        
+    #dels_trop = c.cpd*(T_BLtop - T_out) + g*(-delz_trop) #difference in dry static energy between boundary layer top and tropopause (J)
+    
+    M_trop = (p_BL - p_out)/g #mass of troposphere in kg m^-2
+    M_BL = (p_s - p_BL)/g #mass of boundary layer in kg m^-2
+
+    #radiative heating in dry region interior 
+    Q_dtrop = eps_a*(eps_strat*sig*T_strat**4 + eps_BL*sig*T_BL**4 + (1 - eps_BL)*sig*T_s**4 - 2*sig*T_a**4)
+
+    mheatrate=-0.1 #prescribed heating rate in moist region interior K/day
+    Q_mtrop = (c.cpd*M_trop*mheatrate)/(86400)
+    
+    #radiative warming rate of dry region boundary layer 
+    Q_dBL = (eps_BL*sig**eps_a*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4 + (1 - eps_a)*eps_strat*sig*T_strat**4)
+    
+    delp_BL = p_s - p_BL
+    delz_BL = delp_BL/(rho_BL*g)
+    zhat = delz_BL/c_E
+    
+    #omega_BLs[i,j] = (g*Q_dtrop)/dels_trop
+    #omega_BL = omega_BLs[i,j]
+    #w_BLs[i,j] = omega_BLs[i,j]/(-rho_BLtop*g)
+    #p_LCL, T_LCL = findLCL0(f*q_sat, p_s, T_BL)
+    #T_LCL = findTmoist(thetae0, p_LCL)
+    #delz_LCL = integrate.quad(thickness, p_out, p_LCL)[0]
+    #dels_LCL = c.cpd*(T_LCL-T_out) + g*(-delz_LCL)
+    dels_LCL = dels_trop
+    omega_m = (g*Q_mtrop)/(dels_LCL + L_v*(RH_m*q_sat - q_FA))
+    omega_BL = (g*Q_dtrop)/dels_trop
+    
+    
+    f1 = omega_m*l_m**2 + omega_BL*(l_d**2 - l_m**2)
+    f2 = (RH_m-1)*q_sat - (2*zhat*(q_FA - q_sat))/(l_d**2 - l_m**2)*(l_m + zhat - (zhat + l_d)*np.exp((l_m - l_d)/zhat))
+    f3 = (g*Q_dtrop)/dels_trop - (g*Q_dBL)/dels_BL
+    
+    return (f1, f2, f3)
                                                                                                                                                  
 
 for i, eps_BL in enumerate(eps_BLs):
@@ -127,59 +223,13 @@ for i, eps_BL in enumerate(eps_BLs):
     for j, eps_a in enumerate(eps_as):
         
         print 'eps_a', eps_a
-
-        #T_a = np.mean(Tadb)
-        #T_out = findTmoist(thetae0, p_out)
-        T_out = findT(T_s, p_out)
-        T_strat = T_out
-        #T_strat = np.mean(findTmoist(thetae0, np.linspace(95,p_out,50)))
-        #rho_BL = p_s/(c.Rd*T_BL)
-        s_surf = c.cpd*T_s #dry static energy at surface
         
-                                                    
-                                                    
-        def T_BLfn(p_BL):
-            #T_BLtop = findTmoist(thetae0, p_BL) #temperature of boundary layer top 
-            T_BLtop = findT(T_s, p_BL)
-            T_BL = np.add(T_s, T_BLtop)/2. #temperature of boundary layer, consistent with well-mixed assumption (linear mixing)
-            return T_BL
-            
-        def T_afn(p_BL):
-            T_a = np.mean(findT(T_s, np.linspace(p_out, p_BL, 50)))
-            return T_a
-            
-        def dels_tropfn(p_BL):
-            T_BLtop = findT(T_s, p_BL) #temperature of boundary layer top 
-            thickness = lambda p: (c.Rd/(p*g))*findT(T_s, p)
-            delz_trop = integrate.quad(thickness, p_out, p_BL)[0]
-            #delz_trop = np.zeros(len(p_BL))
-            #for i,p_BLe in enumerate(p_BL):
-            #    delz_trop[i] = integrate.quad(thickness, p_out, p_BLe)[0]
-            dels_trop = c.cpd*np.subtract(T_BLtop, T_out) + g*(-delz_trop) #difference in dry static energy between boundary layer top and tropopause (J)
-            return dels_trop
-            
-        def dels_BLfn(p_BL): 
-            T_BLtop = findT(T_s, p_BL) #temperature of boundary layer top 
-            rho_BLtop = p_BL/np.multiply(c.Rd, T_BLtop)
-            rho_s = p_s/(c.Rd*T_s)
-            rho_BL = (rho_BLtop + rho_s)/2.
-            delz_BL = np.subtract(p_s, p_BL)/(g*rho_BL)
-            s_BLtop = c.cpd*np.array(T_BLtop) + g*np.array(delz_BL) #dry static energy at top of boundary layer
-            s_BL = np.add(s_BLtop,s_surf)/2. #dry static energy of BL (well-mixed)
-            dels_BL = np.subtract(s_BL, s_BLtop) #difference in dry static energy between BL and right above BL
-            return dels_BL
-            
-        #Ta_fn = lambda T_a: eps_a*(eps_strat*sig*T_strat**4 + eps_BL*sig*T_BL**4 + (1-eps_BL)*sig*T_s**4 - 2*sig*T_a**4)/dels_tropfn(p_BL) - eps_BL*((1-eps_a)*eps_strat*sig*T_strat**4 + eps_a*sig*T_a**4 + sig*T_s**4 - 2*sig*T_BL**4)/dels_BLfn(p_BL)    
-        pBL_fn = lambda p_BL: eps_a*(eps_strat*sig*T_strat**4 + eps_BL*sig*T_BLfn(p_BL)**4 + (1-eps_BL)*sig*T_s**4 - 2*sig*T_afn(p_BL)**4)/dels_tropfn(p_BL) - eps_BL*((1-eps_a)*eps_strat*sig*T_strat**4 + eps_a*sig*T_afn(p_BL)**4 + sig*T_s**4 - 2*sig*T_BLfn(p_BL)**4)/dels_BLfn(p_BL)
-        #pBL_fn = lambda p_BL: eps_a*(eps_BL*sig*T_BL**4 + (1-eps_BL)*sig*T_s**4 - 2*sig*T_a**4)/dels_tropfn(p_BL) - eps_BL*( eps_a*sig*T_a**4 + sig*T_s**4 - 2*sig*T_BL**4)/dels_BLfn(p_BL)
-        
-        
-        #p_BL = newton(pBL_fn, 950e2, maxiter=100000)
-        p_BL = fsolve(pBL_fn, 950e2)[0]
-        
-        p_LCL = p_BL
+                                                
+        l_m, RH_m, p_BL = fsolve(equations, [100e3, 0.5, 950e2], xtol=1e-13, maxfev=100000)
         
         p_BLs[i,j] = p_BL
+        delp_BL = p_s - p_BL
+        p_LCL = p_BL
         p_LCLs[i,j] = p_LCL
         T_BL = T_BLfn(p_BL) 
         T_a = T_afn(p_BL)
@@ -194,6 +244,9 @@ for i, eps_BL in enumerate(eps_BLs):
  
         dels_BL = dels_BLfn(p_BL)
         dels_trop = dels_tropfn(p_BL)
+        
+        delz_BL = delp_BL/(rho_BL*g)
+        zhat = delz_BL/c_E
             
         #dels_trop = c.cpd*(T_BLtop - T_out) + g*(-delz_trop) #difference in dry static energy between boundary layer top and tropopause (J)
         
@@ -203,40 +256,15 @@ for i, eps_BL in enumerate(eps_BLs):
         #radiative heating in dry region interior 
         Q_dtrop = eps_a*(eps_strat*sig*T_strat**4 + eps_BL*sig*T_BL**4 + (1 - eps_BL)*sig*T_s**4 - 2*sig*T_a**4)
 
-        mheatrate=-0.1 #prescribed heating rate in moist region interior K/day
+        mheatrate=0.1 #prescribed heating rate in moist region interior K/day
         Q_mtrop = (c.cpd*M_trop*mheatrate)/(86400)
         
         #radiative warming rate of dry region boundary layer 
-        Q_dBL = (eps_BL*sig**eps_a*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4 + (1 - eps_a)*eps_strat*sig*T_strat**4)
+        Q_dBL = (eps_BL*sig**eps_a*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4 + eps_BL*(1 - eps_a)*eps_strat*sig*T_strat**4)
         
         omega_BLs[i,j] = (g*Q_dtrop)/dels_trop
         omega_BL = omega_BLs[i,j]
         w_BLs[i,j] = omega_BLs[i,j]/(-rho_BLtop*g)
-        
-        q_FA = wsat(T_out, p_out)
-        
-                
-        delp_BL = p_s - p_BL
-        delz_BL = delp_BL/(rho_BL*g)
-        zhat = delz_BL/c_E
-        
-        #u_BL = -(omega_BL/(2*delp_BL))*((l_d**2 - r**2))/r
-        
-        def equations(p):
-            l_m, RH_m = p
-            #p_LCL, T_LCL = findLCL0(f*q_sat, p_s, T_BL)
-            #T_LCL = findTmoist(thetae0, p_LCL)
-            #delz_LCL = integrate.quad(thickness, p_out, p_LCL)[0]
-            #dels_LCL = c.cpd*(T_LCL-T_out) + g*(-delz_LCL)
-            dels_LCL = dels_trop
-            omega_m = (g*Q_mtrop)/(dels_LCL + L_v*(RH_m*q_sat - q_FA))
-            
-            f1 = omega_m*l_m**2 + omega_BL*(l_d**2 - l_m**2)
-            f2 = (RH_m-1)*q_sat - (2*zhat*(q_FA - q_sat))/(l_d**2 - l_m**2)*(l_m + zhat - (zhat + l_d)*np.exp((l_m - l_d)/zhat))
-            
-            return (f1, f2)
-            
-        l_m, RH_m = fsolve(equations, [100e3, 0.5], xtol=1e-13, maxfev=100000)
             
         #p_LCL, T_LCL = findLCL0(f*q_sat, p_s, T_BL)
         #T_LCL = findTmoist(thetae0, p_LCL)
@@ -252,7 +280,7 @@ for i, eps_BL in enumerate(eps_BLs):
         #l_mi = np.where(r > l_m)[0][0]
         dels_LCL = dels_trop
         delh = dels_LCL + L_v*(RH_m*q_sat - q_FA)
-
+        #dels_LCL = dels_trop
             
         omega_m = (g*Q_mtrop)/delh
         w_m = -omega_m/(rho_BLtop*g)
@@ -344,7 +372,7 @@ cnetP = np.linspace(-1e8, 1e8, 100)
 plt.figure(1)
 cs=plt.contourf(eps_BLss, eps_ass, p_BLs/1e2, cpBL, cmap=cm.RdYlBu_r, extend='both')
 cs.cmap.set_under('grey')
-cs.cmap.set_over('white')
+cs.cmap.set_over('black')
 plt.xlabel(r'$\epsilon_{BL}$')
 plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'$p_{BL}$ (hPa)')
@@ -353,7 +381,7 @@ plt.show()
 plt.figure(2)
 cs=plt.contourf(eps_BLss, eps_ass, w_BLs, cwBL, cmap=cm.RdBu_r, extend='both')
 cs.cmap.set_under('grey')
-cs.cmap.set_over('white')
+cs.cmap.set_over('black')
 plt.xlabel(r'$\epsilon_{BL}$')
 plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'$w_{BL}$ (m/s)')
@@ -362,7 +390,7 @@ plt.show()
 plt.figure(3)
 cs=plt.contourf(eps_BLss, eps_ass, w_ms, cwm, cmap=cm.RdBu_r, extend='both')
 cs.cmap.set_under('grey')
-cs.cmap.set_over('white')
+cs.cmap.set_over('black')
 plt.xlabel(r'$\epsilon_{BL}$')
 plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'$w_{m}$ (m/s)')
@@ -371,7 +399,7 @@ plt.show()
 plt.figure(4)
 cs=plt.contourf(eps_BLss, eps_ass, l_ms/1e3, clm, cmap=cm.RdYlBu_r, extend='both')
 cs.cmap.set_under('grey')
-cs.cmap.set_over('white')
+cs.cmap.set_over('black')
 plt.xlabel(r'$\epsilon_{BL}$')
 plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'$l_{m}$ (km)')
@@ -380,7 +408,7 @@ plt.show()
 plt.figure(5)
 cs=plt.contourf(eps_BLss, eps_ass, massbalance, cmass, cmap=cm.RdBu_r, extend='both')
 cs.cmap.set_under('grey')
-cs.cmap.set_over('white')
+cs.cmap.set_over('black')
 plt.xlabel(r'$\epsilon_{BL}$')
 plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'mass balance (kg/s)')
@@ -389,7 +417,7 @@ plt.show()
 plt.figure(6)
 cs=plt.contourf(eps_BLss, eps_ass, netprecip, cnetP, cmap=cm.RdBu_r, extend='both')
 cs.cmap.set_under('grey')
-cs.cmap.set_over('white')
+cs.cmap.set_over('black')
 plt.xlabel(r'$\epsilon_{BL}$')
 plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'net precipitation (kg/s)')
@@ -398,7 +426,7 @@ plt.show()
 plt.figure(7)
 cs=plt.contourf(eps_BLss, eps_ass, delhs, cdelh, cmap=cm.RdBu_r, extend='both')
 cs.cmap.set_under('grey')
-cs.cmap.set_over('white')
+cs.cmap.set_over('black')
 plt.xlabel(r'$\epsilon_{BL}$')
 plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'$\Delta h_{trop}$')
@@ -407,7 +435,7 @@ plt.show()
 plt.figure(8)
 cs=plt.contourf(eps_BLss, eps_ass, RH_ms, np.linspace(0,100,100), cmap=cm.RdYlBu_r, extend='both')
 cs.cmap.set_under('grey')
-cs.cmap.set_over('white')
+cs.cmap.set_over('black')
 plt.xlabel(r'$\epsilon_{BL}$')
 plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'relative humidity')

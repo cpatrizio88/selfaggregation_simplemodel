@@ -102,7 +102,7 @@ p_BL = 950e2
 p_trop=150e2
 delz_BL = -h_a*np.log(p_BL/p_s)*1e3
 q_BLbar = 0.017
-q_FA = 0.001
+q_FA = 0.0004
 q_strat = 1e-6
 
 qv = np.zeros(N+1)
@@ -119,8 +119,8 @@ pmids=np.zeros(delz.size)
 qvmids=np.zeros(delz.size)
 
 #f=183 #viewing frequency (GHz), corresponds to 1.3 mm (not sure what band this is)
-#f=700 #corresponds to  0.43 mm (infrared band)
-f=30000 #corresponds to 10 microns (infrared band)
+f=700 #corresponds to  0.43 mm (infrared band)
+#f=30000 #corresponds to 10 microns (infrared band)
 
 CWC = 0
 

@@ -3,7 +3,7 @@ import sys
 #site.addsitedir('\\Users\\Casey\\Dropbox\\research\\code\\thermlib')
 site.addsitedir('/Users/cpatrizio/repos/thermolib/')
 from wsat import wsat
-#from findTmoist import findTmoist
+from findTmoist import findTmoist
 from findLCL0 import findLCL0
 from constants import constants as c
 from scipy.optimize import fsolve
@@ -25,28 +25,30 @@ p_s = 1000e2 #surface pressure (Pa)
 #p_out = 225e2 #tropopause (Pa)
 #p_t = 150e2 #tropopause (Pa)
 
-h=7. #scale height (km)
-gamma_PH = 6.2 #lapse rate (K km^-1)
-zeta_T = 15.0 #km
+#h=7. #scale height (km)
+#gamma_PH = 6.2 #lapse rate (K km^-1)
+#zeta_T = 15.0 #km
+#
+#def findT(T_s, p):
+#    
+#    zeta = -h*np.log(p/p_s)
+#    n = zeta.size
+#    T = np.zeros(n)
+#    if n > 1:
+#        T[zeta < zeta_T] = T_s - gamma_PH*zeta[zeta < zeta_T]
+#        T[zeta >= zeta_T] = T_s - gamma_PH*zeta_T
+#    else:
+#       if (zeta < zeta_T):
+#          T = T_s - gamma_PH*zeta
+#       else:
+#          T = T_s - gamma_PH*zeta_T
+#    return T
+#    
+#    
+#    
+#p_t = p_s*np.exp(-zeta_T/h)
 
-def findT(T_s, p):
-    
-    zeta = -h*np.log(p/p_s)
-    n = zeta.size
-    T = np.zeros(n)
-    if n > 1:
-        T[zeta < zeta_T] = T_s - gamma_PH*zeta[zeta < zeta_T]
-        T[zeta >= zeta_T] = T_s - gamma_PH*zeta_T
-    else:
-       if (zeta < zeta_T):
-          T = T_s - gamma_PH*zeta
-       else:
-          T = T_s - gamma_PH*zeta_T
-    return T
-    
-    
-    
-p_t = p_s*np.exp(-zeta_T/h)
+p_t = 100e2
 
 
 g = 9.81
@@ -56,8 +58,8 @@ T_s = 302
 L_v = 2.257*1e6
 
 #eps_a = 1
-eps_strat = 0.2
-#eps_BL = 0.8
+eps_strat = 0
+#eps_BL = 0.6
 
 #S0 = 413.98 #solar constant
 #theta = 50.5 #zenith angle 
@@ -90,8 +92,8 @@ colors = ['k', 'r', 'g']
 #p_LCLs = np.zeros(len(domsizes))
 
 
-eps_BLs = np.linspace(0.8,1, 20)
-eps_as = np.linspace(0,0.2, 20)
+eps_BLs = np.linspace(0.4, 1, 30)
+eps_as = np.linspace(0.4, 1, 30)
 
 
 eps_BLss, eps_ass = np.meshgrid(eps_BLs, eps_as)
@@ -119,7 +121,8 @@ plevs = np.linspace(50e2, p_s, 1000)
 omega_BLs = np.zeros(eps_BLss.shape)
 w_BLs = np.zeros(eps_BLss.shape)
 
-T_out = findT(T_s, p_out)
+#T_out = findT(T_s, p_out)
+T_out = findTmoist(thetae0, p_out)
 T_strat = T_out
 #T_strat = np.mean(findTmoist(thetae0, np.linspace(95,p_out,50)))
 #rho_BL = p_s/(c.Rd*T_BL)
@@ -145,13 +148,13 @@ for i, eps_BL in enumerate(eps_BLs):
                                                     
                                                     
         def T_BLfn(p_BL):
-            #T_BLtop = findTmoist(thetae0, p_BL) #temperature of boundary layer top 
-            T_BLtop = findT(T_s, p_BL)
+            T_BLtop = findTmoist(thetae0, p_BL) #temperature of boundary layer top 
+            #T_BLtop = findT(T_s, p_BL)
             T_BL = np.add(T_s, T_BLtop)/2. #temperature of boundary layer, consistent with well-mixed assumption (linear mixing)
             return T_BL
             
         def T_afn(p_BL):
-            T_a = np.mean(findT(T_s, np.linspace(p_out, p_BL, 50)))
+            #T_a = np.mean(findT(T_s, np.linspace(p_out, p_BL, 50)))
             return T_a
             
         def dels_tropfn(p_BL):
@@ -235,80 +238,80 @@ for i, eps_BL in enumerate(eps_BLs):
         #p_BL = scipy.optimize.brenth(p_BLequations, 200e2, 950e2, maxiter=100000)  
         #print p_BL
                                         
-        l_m, RH_m = fsolve(equations_new, [100e3, 0.5], maxfev=10000)
+        #l_m, RH_m = fsolve(equations_new, [100e3, 0.5], maxfev=10000)
         
         p_BLs[i,j] = p_BL
-        delp_BL = p_s - p_BL
-        p_LCL = p_BL
-        #p_LCLs[i,j] = p_LCL
-        T_BL = T_BLfn(p_BL) 
-        T_a = T_afn(p_BL)
-        #T_BLs[i,j] = T_BL
-                
-        #T_BLtop = findTmoist(thetae0, p_BL) #temperature of boundary layer top 
-        T_BLtop = findT(T_s, p_BL) #temperature of boundary layer top 
-        rho_BLtop = p_BL/(c.Rd*T_BLtop)
-        
-        rho_BLtop = p_BL/np.multiply(c.Rd, T_BLtop)
-        rho_s = p_s/(c.Rd*T_s)
-        rho_BL = (rho_BLtop + rho_s)/2.
- 
-        dels_BL = dels_BLfn(p_BL)
-        dels_trop = dels_tropfn(p_BL)
-        
-        delz_BL = delp_BL/(rho_BL*g)
-        zhat = delz_BL/c_E
-            
-        #dels_trop = c.cpd*(T_BLtop - T_out) + g*(-delz_trop) #difference in dry static energy between boundary layer top and tropopause (J)
-        
-        M_trop = (p_BL - p_out)/g #mass of troposphere in kg m^-2
-        M_BL = (p_s - p_BL)/g #mass of boundary layer in kg m^-2
-
-        #radiative heating in dry region interior 
-        Q_dtrop = eps_a*(eps_strat*sig*T_strat**4 + eps_BL*sig*T_BL**4 + (1 - eps_BL)*sig*T_s**4 - 2*sig*T_a**4)
-
-        mheatrate=1 #prescribed heating rate in moist region interior K/day
-        Q_mtrop = (c.cpd*M_trop*mheatrate)/(86400)
-        
-        #radiative warming rate of dry region boundary layer 
-        Q_dBL = (eps_BL*sig**eps_a*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4 + (1 - eps_a)*eps_strat*sig*T_strat**4)
-        
-        omega_BLs[i,j] = (g*Q_dtrop)/dels_trop
-        omega_BL = omega_BLs[i,j]
-        w_BLs[i,j] = omega_BLs[i,j]/(-rho_BLtop*g)
-            
-        #p_LCL, T_LCL = findLCL0(f*q_sat, p_s, T_BL)
-        #T_LCL = findTmoist(thetae0, p_LCL)
-        #delz_LCL = integrate.quad(thickness, p_t, p_LCL)[0]
-        #dels_LCL = c.cpd*(T_LCL-T_t) + g*(-delz_LCL)
-        M_LCL = (p_LCL - p_t)/g  #mass of convective region (from LCL to tropopause) in kg m^-2
-        
-        #W_m = Q_mtrop/(c.cpd*M_LCL)
-        #W_d = Q_dtrop/(c.cpd*M_trop)
-        
-        #l_m = l_mfn(f)
-            
-        #l_mi = np.where(r > l_m)[0][0]
-        dels_LCL = dels_trop
-        delh = dels_LCL + L_v*(RH_m*q_sat - q_FA)
-        #dels_LCL = dels_trop
-            
-        omega_m = (g*Q_mtrop)/delh
-        w_m = -omega_m/(rho_BLtop*g)
-        
-        P = -(1./g)*omega_m*np.pi*l_m**2*(RH_m*q_sat - q_FA)
-        
-        E = (1./g)*(2*np.pi*omega_BL)*(q_sat - q_FA)*((l_d**2 - l_m**2)/2. + zhat*(l_d - l_m) - zhat*(zhat + l_d)*(1 - np.exp((l_m - l_d)/zhat)))
-        
-        qBL_m = RH_m*q_sat
-        qBL_sat = wsat(T_BL, (p_s + p_BL)/2.)
-        
-        netprecip[i,j] = P - E
-        l_ms[i,j] = l_m
-        RH_ms[i,j] = qBL_m/qBL_sat
-        delhs[i,j] = delh
-        w_ms[i,j] = w_m
-        massbalance[i,j] = omega_BL*(l_d**2 - l_m**2) + omega_m*l_m**2
+#        delp_BL = p_s - p_BL
+#        p_LCL = p_BL
+#        #p_LCLs[i,j] = p_LCL
+#        T_BL = T_BLfn(p_BL) 
+#        T_a = T_afn(p_BL)
+#        #T_BLs[i,j] = T_BL
+#                
+#        #T_BLtop = findTmoist(thetae0, p_BL) #temperature of boundary layer top 
+#        T_BLtop = findT(T_s, p_BL) #temperature of boundary layer top 
+#        rho_BLtop = p_BL/(c.Rd*T_BLtop)
+#        
+#        rho_BLtop = p_BL/np.multiply(c.Rd, T_BLtop)
+#        rho_s = p_s/(c.Rd*T_s)
+#        rho_BL = (rho_BLtop + rho_s)/2.
+# 
+#        dels_BL = dels_BLfn(p_BL)
+#        dels_trop = dels_tropfn(p_BL)
+#        
+#        delz_BL = delp_BL/(rho_BL*g)
+#        zhat = delz_BL/c_E
+#            
+#        #dels_trop = c.cpd*(T_BLtop - T_out) + g*(-delz_trop) #difference in dry static energy between boundary layer top and tropopause (J)
+#        
+#        M_trop = (p_BL - p_out)/g #mass of troposphere in kg m^-2
+#        M_BL = (p_s - p_BL)/g #mass of boundary layer in kg m^-2
+#
+#        #radiative heating in dry region interior 
+#        Q_dtrop = eps_a*(eps_strat*sig*T_strat**4 + eps_BL*sig*T_BL**4 + (1 - eps_BL)*sig*T_s**4 - 2*sig*T_a**4)
+#
+#        mheatrate=-0.1 #prescribed heating rate in moist region interior K/day
+#        Q_mtrop = (c.cpd*M_trop*mheatrate)/(86400)
+#        
+#        #radiative warming rate of dry region boundary layer 
+#        Q_dBL = (eps_BL*sig**eps_a*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4 + (1 - eps_a)*eps_strat*sig*T_strat**4)
+#        
+#        omega_BLs[i,j] = (g*Q_dtrop)/dels_trop
+#        omega_BL = omega_BLs[i,j]
+#        w_BLs[i,j] = omega_BLs[i,j]/(-rho_BLtop*g)
+#            
+#        #p_LCL, T_LCL = findLCL0(f*q_sat, p_s, T_BL)
+#        #T_LCL = findTmoist(thetae0, p_LCL)
+#        #delz_LCL = integrate.quad(thickness, p_t, p_LCL)[0]
+#        #dels_LCL = c.cpd*(T_LCL-T_t) + g*(-delz_LCL)
+#        M_LCL = (p_LCL - p_t)/g  #mass of convective region (from LCL to tropopause) in kg m^-2
+#        
+#        #W_m = Q_mtrop/(c.cpd*M_LCL)
+#        #W_d = Q_dtrop/(c.cpd*M_trop)
+#        
+#        #l_m = l_mfn(f)
+#            
+#        #l_mi = np.where(r > l_m)[0][0]
+#        dels_LCL = dels_trop
+#        delh = dels_LCL + L_v*(RH_m*q_sat - q_FA)
+#        #dels_LCL = dels_trop
+#            
+#        omega_m = (g*Q_mtrop)/delh
+#        w_m = -omega_m/(rho_BLtop*g)
+#        
+#        P = -(1./g)*omega_m*np.pi*l_m**2*(RH_m*q_sat - q_FA)
+#        
+#        E = (1./g)*(2*np.pi*omega_BL)*(q_sat - q_FA)*((l_d**2 - l_m**2)/2. + zhat*(l_d - l_m) - zhat*(zhat + l_d)*(1 - np.exp((l_m - l_d)/zhat)))
+#        
+#        qBL_m = RH_m*q_sat
+#        qBL_sat = wsat(T_BL, (p_s + p_BL)/2.)
+#        
+#        netprecip[i,j] = P - E
+#        l_ms[i,j] = l_m
+#        RH_ms[i,j] = qBL_m/qBL_sat
+#        delhs[i,j] = delh
+#        w_ms[i,j] = w_m
+#        massbalance[i,j] = omega_BL*(l_d**2 - l_m**2) + omega_m*l_m**2
         
     #    print '-----------------------------------'
     #    print 'balances:'
@@ -389,68 +392,68 @@ plt.ylabel(r'$\epsilon_{a}$')
 plt.colorbar(label=r'$p_{BL}$ (hPa)')
 plt.show()
 
-plt.figure(2)
-cs=plt.contourf(eps_BLss, eps_ass, w_BLs, cwBL, cmap=cm.RdBu_r, extend='both')
-cs.cmap.set_under('grey')
-cs.cmap.set_over('black')
-plt.xlabel(r'$\epsilon_{BL}$')
-plt.ylabel(r'$\epsilon_{a}$')
-plt.colorbar(label=r'$w_{BL}$ (m/s)')
-plt.show()
-
-plt.figure(3)
-cs=plt.contourf(eps_BLss, eps_ass, w_ms, cwm, cmap=cm.RdBu_r, extend='both')
-cs.cmap.set_under('grey')
-cs.cmap.set_over('black')
-plt.xlabel(r'$\epsilon_{BL}$')
-plt.ylabel(r'$\epsilon_{a}$')
-plt.colorbar(label=r'$w_{m}$ (m/s)')
-plt.show()
-
-plt.figure(4)
-cs=plt.contourf(eps_BLss, eps_ass, l_ms/1e3, clm, cmap=cm.RdYlBu_r, extend='both')
-cs.cmap.set_under('grey')
-cs.cmap.set_over('black')
-plt.xlabel(r'$\epsilon_{BL}$')
-plt.ylabel(r'$\epsilon_{a}$')
-plt.colorbar(label=r'$l_{m}$ (km)')
-plt.show()
-
-plt.figure(5)
-cs=plt.contourf(eps_BLss, eps_ass, massbalance, cmass, cmap=cm.RdBu_r, extend='both')
-cs.cmap.set_under('grey')
-cs.cmap.set_over('black')
-plt.xlabel(r'$\epsilon_{BL}$')
-plt.ylabel(r'$\epsilon_{a}$')
-plt.colorbar(label=r'mass balance (kg/s)')
-plt.show()
-
-plt.figure(6)
-cs=plt.contourf(eps_BLss, eps_ass, netprecip, cnetP, cmap=cm.RdBu_r, extend='both')
-cs.cmap.set_under('grey')
-cs.cmap.set_over('black')
-plt.xlabel(r'$\epsilon_{BL}$')
-plt.ylabel(r'$\epsilon_{a}$')
-plt.colorbar(label=r'net precipitation (kg/s)')
-plt.show()
-
-plt.figure(7)
-cs=plt.contourf(eps_BLss, eps_ass, delhs, cdelh, cmap=cm.RdBu_r, extend='both')
-cs.cmap.set_under('grey')
-cs.cmap.set_over('black')
-plt.xlabel(r'$\epsilon_{BL}$')
-plt.ylabel(r'$\epsilon_{a}$')
-plt.colorbar(label=r'$\Delta h_{trop}$')
-plt.show()
-
-plt.figure(8)
-cs=plt.contourf(eps_BLss, eps_ass, RH_ms, np.linspace(0,100,100), cmap=cm.RdYlBu_r, extend='both')
-cs.cmap.set_under('grey')
-cs.cmap.set_over('black')
-plt.xlabel(r'$\epsilon_{BL}$')
-plt.ylabel(r'$\epsilon_{a}$')
-plt.colorbar(label=r'relative humidity')
-plt.show()
+#plt.figure(2)
+#cs=plt.contourf(eps_BLss, eps_ass, w_BLs, cwBL, cmap=cm.RdBu_r, extend='both')
+#cs.cmap.set_under('grey')
+#cs.cmap.set_over('black')
+#plt.xlabel(r'$\epsilon_{BL}$')
+#plt.ylabel(r'$\epsilon_{a}$')
+#plt.colorbar(label=r'$w_{BL}$ (m/s)')
+#plt.show()
+#
+#plt.figure(3)
+#cs=plt.contourf(eps_BLss, eps_ass, w_ms, cwm, cmap=cm.RdBu_r, extend='both')
+#cs.cmap.set_under('grey')
+#cs.cmap.set_over('black')
+#plt.xlabel(r'$\epsilon_{BL}$')
+#plt.ylabel(r'$\epsilon_{a}$')
+#plt.colorbar(label=r'$w_{m}$ (m/s)')
+#plt.show()
+#
+#plt.figure(4)
+#cs=plt.contourf(eps_BLss, eps_ass, l_ms/1e3, clm, cmap=cm.RdYlBu_r, extend='both')
+#cs.cmap.set_under('grey')
+#cs.cmap.set_over('black')
+#plt.xlabel(r'$\epsilon_{BL}$')
+#plt.ylabel(r'$\epsilon_{a}$')
+#plt.colorbar(label=r'$l_{m}$ (km)')
+#plt.show()
+#
+#plt.figure(5)
+#cs=plt.contourf(eps_BLss, eps_ass, massbalance, cmass, cmap=cm.RdBu_r, extend='both')
+#cs.cmap.set_under('grey')
+#cs.cmap.set_over('black')
+#plt.xlabel(r'$\epsilon_{BL}$')
+#plt.ylabel(r'$\epsilon_{a}$')
+#plt.colorbar(label=r'mass balance (kg/s)')
+#plt.show()
+#
+#plt.figure(6)
+#cs=plt.contourf(eps_BLss, eps_ass, netprecip, cnetP, cmap=cm.RdBu_r, extend='both')
+#cs.cmap.set_under('grey')
+#cs.cmap.set_over('black')
+#plt.xlabel(r'$\epsilon_{BL}$')
+#plt.ylabel(r'$\epsilon_{a}$')
+#plt.colorbar(label=r'net precipitation (kg/s)')
+#plt.show()
+#
+#plt.figure(7)
+#cs=plt.contourf(eps_BLss, eps_ass, delhs, cdelh, cmap=cm.RdBu_r, extend='both')
+#cs.cmap.set_under('grey')
+#cs.cmap.set_over('black')
+#plt.xlabel(r'$\epsilon_{BL}$')
+#plt.ylabel(r'$\epsilon_{a}$')
+#plt.colorbar(label=r'$\Delta h_{trop}$')
+#plt.show()
+#
+#plt.figure(8)
+#cs=plt.contourf(eps_BLss, eps_ass, RH_ms, np.linspace(0,100,100), cmap=cm.RdYlBu_r, extend='both')
+#cs.cmap.set_under('grey')
+#cs.cmap.set_over('black')
+#plt.xlabel(r'$\epsilon_{BL}$')
+#plt.ylabel(r'$\epsilon_{a}$')
+#plt.colorbar(label=r'relative humidity')
+#plt.show()
 
 
 
