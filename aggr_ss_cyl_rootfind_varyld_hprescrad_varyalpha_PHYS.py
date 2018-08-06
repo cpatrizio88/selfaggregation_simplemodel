@@ -15,12 +15,12 @@ import thermo
 from constants import constants
 from matplotlib.ticker import FormatStrFormatter
 from scipy.optimize import fsolve, brentq
-fout = '/Volumes/GoogleDrive/My Drive/MS/figures/simplemodelNEW/'
+fout = '/Volumes/GoogleDrive/My Drive/MS/MS figures/simplemodelNEW/'
 
 #plt.style.use('seaborn')
-matplotlib.rcParams.update({'font.size': 24})
+matplotlib.rcParams.update({'font.size': 28})
 matplotlib.rcParams.update({'figure.figsize': (16, 10)})
-matplotlib.rcParams.update({'lines.linewidth': 2})
+matplotlib.rcParams.update({'lines.linewidth': 4})
 matplotlib.rcParams.update({'legend.fontsize': 20})
 matplotlib.rcParams.update({'mathtext.fontset': 'cm'})
 
@@ -41,13 +41,13 @@ d = 100000e3 #
 
 p_s = 1000e2 #surface pressure (Pa)
 p_t = 150e2 #tropopause (Pa)
-p_BL = 900e2 #boundary layer top (Pa)
+p_BL = 950e2 #boundary layer top (Pa)
 
 #eps_a = 1
 #eps_BL = 0.6
 
 #domsizes = [500, 1000, 1500, 3000]
-domsizes = np.linspace(3000, 10000, 50)
+domsizes = np.linspace(500, 10000, 150)
 #colors = ['k', 'r', 'g']
 
 #domsizes = np.linspace(200, 7000, 30)
@@ -67,7 +67,11 @@ labels=[]
 
 for v, alpha in enumerate(alphas):
     
-    cplot =  str(v/(1.0*len(alphas)))
+    cplot =  v/(1.0*len(alphas))
+    if alpha < 0.1: 
+        cplot = str(cplot + 0.1)
+    else:
+        cplot = str(cplot)
     
     print alpha
     
@@ -128,7 +132,7 @@ for v, alpha in enumerate(alphas):
         delz_BL = M_BL/rho_BL
         
         zhat = delz_BL/c_E
-        
+
         
         q_BL = q_sat + 2*zhat*(q_FA - q_sat)/(l_d**2 - r**2)*(r + zhat - (zhat + l_d)*np.exp((r - l_d)/zhat))
         
@@ -368,6 +372,7 @@ for v, alpha in enumerate(alphas):
     domsize_sim = np.array([768, 1536, 3072])    
     sigma_sim = np.array([0.051, 0.062, 0.082])
     wc_sim = np.array([0.069, 0.054, 0.038])
+    omegac_sim = -rho_BL*g*wc_sim
     q_BLc_sim = np.array([17.0, 17.6, 18.1])
     RH_c_sim = np.array([89.3, 90.2, 90.3])
     l_c_sim = np.sqrt((sigma_sim*domsize_sim**2)/np.pi)
@@ -375,7 +380,7 @@ for v, alpha in enumerate(alphas):
     P_sim = np.array([81.2, 58.9, 41.2])*(rho_w/1000)*(86400)
     alpha_sim = np.array([0.05, 0.07, 0.09])
     colors_sim = ['k', 'r', 'g']
-    delhtropeff_sim = delh_sim + (-L_v*q_BLc_sim*1e-3)*(alpha_sim)/(1-alpha_sim)
+    delheff_sim = delh_sim + (-L_v*q_BLc_sim*1e-3)*(alpha_sim)/(1-alpha_sim)
 
     
     plt.figure(4)
@@ -385,8 +390,8 @@ for v, alpha in enumerate(alphas):
     #plt.scatter(domsize_sim*(1./np.sqrt(2)), l_c_sim, 60, marker='x', c=colors_sim)
     if alpha > 0:
         plt.plot(l_ds[negGMS][0]/1e3, l_ms[negGMS][0]/1e3, '.', color='b', markersize=10, mew=3)
-    plt.xlabel(r'$l_d$ (km)')
-    plt.ylabel(r'$l_c$ (km)')
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$l_c$ (km)', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
         plt.plot(domsize_sim[0]*(1./np.sqrt(2)), l_c_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
@@ -409,9 +414,9 @@ for v, alpha in enumerate(alphas):
     plt.plot(l_ds[negGMS]/1e3, sigma[negGMS], fmt,  color='b')
     #plt.scatter(domsize_sim*(1./np.sqrt(2)), sigma_sim, 60, marker='x', c=colors_sim)
     if alpha > 0:
-        plt.plot(l_ds[negGMS][0]/1e3, sigma[negGMS][0], '.', color ='b', markersize = 10, mew=3)
-    plt.xlabel(r'$l_d$ (km)')
-    plt.ylabel(r'$\sigma$')
+        plt.plot(l_ds[negGMS][0]/1e3, sigma[negGMS][0], '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$\sigma$', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
         plt.plot(domsize_sim[0]*(1./np.sqrt(2)), sigma_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
@@ -431,9 +436,9 @@ for v, alpha in enumerate(alphas):
     plt.plot(l_ds[negGMS]/1e3, w_ms[negGMS], fmt,  color='b')
     #plt.scatter(domsize_sim*(1./np.sqrt(2)), wc_sim, 60, marker='x', c=colors_sim)
     if alpha > 0:
-        plt.plot(l_ds[negGMS][0]/1e3, w_ms[negGMS][0], '.', color ='b', markersize = 10, mew=3)
-    plt.xlabel(r'$l_d$ (km)')
-    plt.ylabel(r'$w_c$ (m/s)')
+        plt.plot(l_ds[negGMS][0]/1e3, w_ms[negGMS][0], '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$w_c$ (m/s)', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
         plt.plot(domsize_sim[0]*(1./np.sqrt(2)), wc_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
@@ -462,11 +467,11 @@ for v, alpha in enumerate(alphas):
     h2, =ax1.plot(l_ds[negGMS]/1e3, q_BLms[negGMS]*1e3, fmt,  color='b')
     #plt.scatter(domsize_sim*(1./np.sqrt(2)), q_BLc_sim, 60, marker='x', c=colors_sim)
     if alpha > 0:
-        ax1.plot(l_ds[negGMS][0]/1e3, q_BLms[negGMS][0]*1e3, '.', color='b', markersize = 10, mew=3)
-    ax1.set_xlabel(r'$l_d$ (km)')
+        ax1.plot(l_ds[negGMS][0]/1e3, q_BLms[negGMS][0]*1e3, '.', color='b', markersize = 20, mew=3)
+    ax1.set_xlabel(r'$l_d$ (km)', fontsize=34)
     #ax1.set_ylim(20, 24)
     #ax2.set_ylim(80, 100)
-    ax1.set_ylabel(r'$q_{BL,c}$ (g/kg)')
+    ax1.set_ylabel(r'$q_{BL,c}$ (g/kg)', fontsize=34)
     #ax2.set_ylabel(r'$RH_c$ (%)')
     #plt.legend(loc='best')
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
@@ -499,9 +504,9 @@ for v, alpha in enumerate(alphas):
     #plt.plot(l_ds[negGMS]/1e3, Ps[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
     plt.plot(l_ds[negGMS]/1e3, Ps[negGMS], fmt,  color='b')
     if alpha > 0:
-        plt.plot(l_ds[negGMS][0]/1e3, Ps[negGMS][0], '.', color ='b', markersize = 10, mew=3)
-    plt.xlabel(r'$l_d$ (km)')
-    plt.ylabel(r'$P$ (mm/day)')
+        plt.plot(l_ds[negGMS][0]/1e3, Ps[negGMS][0], '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$P$ (mm/day)', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
         plt.legend(loc='best')
@@ -519,9 +524,9 @@ for v, alpha in enumerate(alphas):
     plt.plot(l_ds[negGMS]/1e3, delhs[negGMS], fmt,  color='b')
     #plt.scatter(domsize_sim*(1./np.sqrt(2)), delh_sim, 60, marker='x', c=colors_sim)
     if alpha > 0:
-        plt.plot(l_ds[negGMS][0]/1e3, delhs[negGMS][0], '.', color ='b', markersize = 10, mew=3)
-    plt.xlabel(r'$l_d$ (km)')
-    plt.ylabel(r'$\Delta h_{trop}$ (J)')
+        plt.plot(l_ds[negGMS][0]/1e3, delhs[negGMS][0], '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$\Delta h_{trop}$ (J)', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
         plt.plot(domsize_sim[0]*(1./np.sqrt(2)), delh_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
@@ -540,11 +545,14 @@ for v, alpha in enumerate(alphas):
     #plt.plot(l_ds[negGMS]/1e3, delhseff[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
     plt.plot(l_ds[negGMS]/1e3, delhseff[negGMS], fmt,  color='b')
     if alpha > 0:
-        plt.plot(l_ds[negGMS][0]/1e3, delhseff[negGMS][0], '.', color ='b', markersize = 10, mew=3)
-    plt.xlabel(r'$l_d$ (km)')
-    plt.ylabel(r'$\Delta h_{trop,eff}$ (J)')
+        plt.plot(l_ds[negGMS][0]/1e3, delhseff[negGMS][0], '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$\Delta h_{trop,eff}$ (J)', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
+        plt.plot(domsize_sim[0]*(1./np.sqrt(2)), delheff_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
+        plt.plot(domsize_sim[1]*(1./np.sqrt(2)), delheff_sim[1], 'x', color=colors_sim[1], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[1]))
+        plt.plot(domsize_sim[2]*(1./np.sqrt(2)), delheff_sim[2], 'x', color=colors_sim[2], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[2]))
         plt.legend(loc='best')
         plt.axhline(0, color='b', alpha=0.9)
         plt.xlim(0, domsizes[-1])
@@ -560,9 +568,9 @@ for v, alpha in enumerate(alphas):
     plt.plot(l_ds[negGMS]/1e3, RHs[negGMS]*100, fmt,  color='b')
     #plt.scatter(domsize_sim*(1./np.sqrt(2)), RH_c_sim, 60, marker='x', c=colors_sim)
     if alpha > 0:
-        plt.plot(l_ds[negGMS][0]/1e3, RHs[negGMS][0]*100, '.', color ='b', markersize = 10, mew=3)
-    plt.xlabel(r'$l_d$ (km)')
-    plt.ylabel(r'$RH_c$ (%)')
+        plt.plot(l_ds[negGMS][0]/1e3, RHs[negGMS][0]*100, '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$RH_c$ (%)', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
         plt.plot(domsize_sim[0]*(1./np.sqrt(2)), RH_c_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
@@ -584,9 +592,9 @@ for v, alpha in enumerate(alphas):
     plt.plot(l_ds[negGMS]/1e3, GMS[negGMS], fmt,  color='b')
     #plt.scatter(domsize_sim*(1./np.sqrt(2)), delh_sim, 60, marker='x', c=colors_sim)
     if alpha > 0:
-        plt.plot(l_ds[negGMS][0]/1e3, GMS[negGMS][0], '.', color ='b', markersize = 10, mew=3)
-    plt.xlabel(r'$l_d$ (km)')
-    plt.ylabel(r'GMS (W/m$^2$)')
+        plt.plot(l_ds[negGMS][0]/1e3, GMS[negGMS][0], '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$M$ (W/m$^2$)', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
         # plt.plot(domsize_sim[0]*(1./np.sqrt(2)), delh_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
