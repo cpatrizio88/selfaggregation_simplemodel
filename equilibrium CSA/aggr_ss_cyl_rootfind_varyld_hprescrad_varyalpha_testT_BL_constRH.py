@@ -2,7 +2,7 @@ import site
 import sys
 #site.addsitedir('\\Users\\Casey\\Dropbox\\research\\code\\thermlib')
 site.addsitedir('/Users/cpatrizio/repos/thermolib/')
-from wsat import wsat
+from wsatnew import wsatnew
 from findTmoist_new import findTmoist
 from findLCL0 import findLCL0
 from constants import constants as c
@@ -15,7 +15,7 @@ import thermo
 from constants import constants
 from matplotlib.ticker import FormatStrFormatter
 from scipy.optimize import fsolve, brentq
-fout = '/Volumes/GoogleDrive/My Drive/MS/MS figures/simplemodelNEW/'
+fout = '/Users/cpatrizio/figures_arc/simple_model/'
 
 #plt.style.use('seaborn')
 matplotlib.rcParams.update({'font.size': 28})
@@ -46,16 +46,21 @@ p_BL = 950e2 #boundary layer top (Pa)
 #eps_a = 1
 #eps_BL = 0.6
 
-#domsizes = [500, 1000, 1500, 3000]
-domsizes = np.linspace(500, 10000, 150)
+#domsizes = [500, 1000, 1500, 3000]r
+domsizes = np.linspace(700, 5000, 60)
 #colors = ['k', 'r', 'g']
 
 #domsizes = np.linspace(200, 7000, 30)
 
 
 #alphas = np.array([0, 0.05, 0.08, 0.10])
-alphas = np.array([0.10, 0.08, 0.05, 0.00])
+#alphas = np.array([0.12,0.08,0.04,0.02])
+alphas = np.array([0.12,0.06,0.02])
 #alphas = np.array([0])
+
+#alphas = np.array([0.15])
+
+#alphas = np.array([0.05])
 
 #mheatrates = np.array([-0.1, -0.2, -0.3])
 end = len(alphas)
@@ -91,6 +96,157 @@ for v, alpha in enumerate(alphas):
     p_LCLs = np.zeros(len(domsizes))
     q_BLms = np.zeros(len(domsizes))
     omega_ms = np.zeros(len(domsizes))
+    T_BLcs = np.zeros(len(domsizes))
+    p_BLcs = np.zeros(len(domsizes))
+    theta_BLcs = np.zeros(len(domsizes))
+    
+    q_sat = wsatnew(T_s, p_s) #mixing ratio above sea surface (100% saturated)    
+    thetae0 = thermo.theta_e(T_s, p_s, q_sat, 0) #theta_e in moist region 
+                                                #use surface temperature to get moist adiaba
+    
+    T_BLtop = findTmoist(thetae0, p_BL) #temperature of boundary layer top 
+    T_t = findTmoist(thetae0, p_t) #temperature of tropopause (outflow region)
+    #T_BL = (T_s + T_BLtop)/2. #temperature of boundary layer, consistent with well-mixed assumption (linear mixing)
+    T_BL = T_s
+    #T_BLtop = T_BL
+    q_BLsat = wsatnew(T_BL, (p_s + p_BL)/2.)
+    q_BLtopsat = wsatnew(T_BLtop, p_BL)
+    
+    q_FA = wsatnew(T_t, p_t) #free troposphere water vapor mixing ratio
+    #q_FA = 0.01
+    
+    #q_FAd = q_FA
+    
+    
+    #q_FA = 0.001
+    
+    M_trop = (p_BL - p_t)/g #mass of troposphere in kg m^-2
+    M_BL = (p_s - p_BL)/g #mass of boundary layer in kg m^-2
+            
+    #delz_BL = ((c.Rd*T_BL)/g)*np.log(p_s/p_BL) #boundary layer thickness (m)
+    rho_BL = p_BL/(c.Rd*T_BL)
+    rho_s = p_s/(c.Rd*T_s)
+    #rho_BL = (rho_BLtop + rho_s)/2. #density of boundary layer 
+    delz_BL = M_BL/rho_BL
+    
+    zhat = delz_BL/c_E
+
+    
+    #q_BL = q_sat + 2*zhat*(q_FA - q_sat)/(l_d**2 - r**2)*(r + zhat - (zhat + l_d)*np.exp((r - l_d)/zhat))
+    
+    
+    q_FA = wsatnew(T_t, p_t) #free troposphere water vapor mixing ratio
+    #q_FA = 0.001
+    T_c = T_t #cloud top temperature
+        
+    thickness = lambda p: (c.Rd/(p*g))*findTmoist(thetae0, p)
+    delz_trop = integrate.quad(thickness, p_t, p_BL)[0]
+    
+    s_trop = c.cpd*T_t + g*(delz_BL + delz_trop)
+    
+    s_BLtop = c.cpd*T_BLtop + g*delz_BL #dry static energy at top of boundary layer
+    s_surf = c.cpd*T_s #dry static energy at surface
+        
+    s_BL = (s_BLtop + s_surf)/2.
+    
+    s_BL = c.cpd*T_BL + (g*delz_BL)/2.
+        
+    dels_trop = s_BL - s_trop #difference in dry static energy between boundary layer top and tropopause (J)
+        
+    delq = q_sat - q_FA #difference in mixing ratio between sea surface and tropopause
+        
+#dry static energy of BL (well-mixed)
+    #dels_BL = s_BL - s_BLtop #difference in dry static energy between BL and right above BL
+        
+    #K = dels_BL/dels_trop #constant for calculating T_a
+    
+    #T_a = np.mean(findTmoist(thetae0, np.linspace(p_t, p_BL, 100)))
+    
+    #Ta_fn = lambda T_a: eps_a*(eps_BL*sig*T_BL**4 + (1-eps_BL)*sig*T_s**4 - 2*sig*T_a**4)/dels_trop - eps_BL*(eps_a*sig*T_a**4 + sig*T_s**4 - 2*sig*T_BL**4)/(dels_BL)
+    
+    #T_a = fsolve(Ta_fn, 270)
+
+    #T_a = 280
+        
+    #eps_BL = 0.6 #boundary layer emissivity (CALCULATE THIS)
+    
+    #effective emission temperature of troposphere (K)
+    #this was derived using the constraint that omega_BL driven by cooling in troposphere must be
+    #equal to omega_BL driven by cooling in boundary layer
+    #FIX THIS
+    #T_a = ((eps_BL*T_BL**4*(K+2) + T_s**4*(K*(1-eps_BL) - eps_BL))/(eps_BL + 2*K))**0.25
+    #T_a = 270
+    
+    #eps_BL = eps_a*(2*T_a**4 - T_s**4)/(T_BL**4*(eps_a - 2*K) - T_s**4*(eps_a + K) - eps_a*K*T_a**4)
+        
+    #radiative warming rate in dry region interior (K s^-1)
+    #W_d = (eps_BL*sig*T_BL**4 + (1 - eps_BL)*sig*T_s**4 - 2*sig*T_a**4)/(c.cpd*M_trop)
+    
+    #Q_dtrop = eps_a*(eps_BL*sig*T_BL**4 + (1 - eps_BL)*sig*T_s**4 - 2*sig*T_a**4)
+    
+    dheatrate=-1 #prescribed heating rate in moist region interior K/day
+    Q_dtrop = (c.cpd*M_trop*dheatrate)/(86400)
+        
+    #radiative warming rate of moist region interior (K s^-1)
+    #W_m = (S - sig*T_c**4)/(c.cpd*M_trop)
+    #Q_mtrop = (S - sig*T_c**4)
+    mheatrate=-0.6#prescribed heating rate in moist region interior K/day
+    Q_mtrop = (c.cpd*M_trop*mheatrate)/(86400)
+    
+    #radiative warming rate of dry region boundary layer (K s^-1)
+    #W_BL = (eps_BL*sig*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4)/(c.cpd*M_BL)
+    #Q_dBL = (eps_BL*sig**eps_a*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4)
+    
+    #vertical velocity in dry region
+    omega_BL = (g*Q_dtrop)/(dels_trop)
+    
+    w_BL = omega_BL/(-rho_BL*g) 
+    
+    delp_BL = p_s - p_BL
+    
+    #u_BL = -(omega_BL/(2*delp_BL))*((l_d**2 - r**2))/r
+    
+    #p_d = (rho_BL/8)*(omega_BL/delp_BL)**2*(r**4 - l_d**4)/r**2
+    
+    #p_m = -(rho_BL/8)*(omega_BL/delp_BL)**2*(r**2)
+    
+    c_D = 0.001
+    coef = (omega_BL/(2*delp_BL))**2    
+    
+    PI_s = c.cpd*1.0
+    PI_BL = c.cpd*(p_BL/p_s)**(c.Rd/c.cpd)   
+                
+    dels_tropd = c.cpd*(T_s-T_t) + g*(-delz_trop)
+    omega_BL = (g*Q_dtrop)/dels_tropd
+    #rs = np.linspace(r, l_d, 1e5)
+    
+
+    def theta_v(r, l_d):
+        rs = np.linspace(r, l_d, 1e5)
+        coef = (omega_BL/(2*delp_BL))**2    
+        dpdr = -rho_s*coef*((l_d**4 - rs**4)/rs**3 + (c_D/delz_BL)*((l_d**2 - rs**2)**2)/rs**2)
+        dTdr = -(2/(PI_s - PI_BL))*(1/rho_s)*dpdr
+        #ps = p_s + np.cumsum(dpdr[::-1][:-1]*np.diff(rs))
+        Ts = T_s + np.cumsum(dTdr[::-1][:-1]*np.diff(rs))
+        #Ts = (ps/(rho_s*c.Rd))
+        return Ts[-1]
+        
+    def p(r, l_d):
+        rs = np.linspace(r, l_d, 1e5)
+        coef = (omega_BL/(2*delp_BL))**2    
+        #rs = np.linspace(r, l_d, 1e5)
+        dpdr = -rho_s*coef*((l_d**4 - rs**4)/rs**3 + (c_D/delz_BL)*((l_d**2 - rs**2)**2)/rs**2)
+        #dTdr = -(2/PI_s - PI_BL)*(1/rho_s)*dpdr
+        #ps = p_s + np.cumsum(dpdr[::-1][:-1]*np.diff(rs))
+        ps = p_s + np.cumsum(dpdr[::-1][:-1]*np.diff(rs))
+        #Ts = (ps/(rho_s*c.Rd))
+        return ps[-1]
+    
+        
+    def thetav_to_T(thetav,q):
+        T = thetav/(1+ 0.61*q)
+        return T
+                    
 
 
     for j, domsize in enumerate(domsizes):
@@ -101,152 +257,100 @@ for v, alpha in enumerate(alphas):
         
         r = np.linspace(0, l_d, 1e6)
         
-        
-        q_sat = wsat(T_s, p_s) #mixing ratio above sea surface (100% saturated)    
-        thetae0 = thermo.theta_e(T_s, p_s, q_sat, 0) #theta_e in moist region 
-                                                    #use surface temperature to get moist adiaba
-        
-        T_BLtop = findTmoist(thetae0, p_BL) #temperature of boundary layer top 
-        T_t = findTmoist(thetae0, p_t) #temperature of tropopause (outflow region)
-        #T_BL = (T_s + T_BLtop)/2. #temperature of boundary layer, consistent with well-mixed assumption (linear mixing)
-        T_BL = T_s
-        #T_BLtop = T_BL
-        q_BLsat = wsat(T_BL, (p_s + p_BL)/2.)
-        q_BLtopsat = wsat(T_BLtop, p_BL)
-        
-        q_FA = wsat(T_t, p_t) #free troposphere water vapor mixing ratio
-        #q_FA = 0.01
-        
-        #q_FAd = q_FA
-        
-        
-        #q_FA = 0.001
-        
-        M_trop = (p_BL - p_t)/g #mass of troposphere in kg m^-2
-        M_BL = (p_s - p_BL)/g #mass of boundary layer in kg m^-2
-                
-        #delz_BL = ((c.Rd*T_BL)/g)*np.log(p_s/p_BL) #boundary layer thickness (m)
-        rho_BL = p_BL/(c.Rd*T_BL)
-        rho_s = p_s/(c.Rd*T_s)
-        #rho_BL = (rho_BLtop + rho_s)/2. #density of boundary layer 
-        delz_BL = M_BL/rho_BL
-        
-        zhat = delz_BL/c_E
-
-        
-        q_BL = q_sat + 2*zhat*(q_FA - q_sat)/(l_d**2 - r**2)*(r + zhat - (zhat + l_d)*np.exp((r - l_d)/zhat))
-        
-        
-        q_FA = wsat(T_t, p_t) #free troposphere water vapor mixing ratio
-        #q_FA = 0.001
-        T_c = T_t #cloud top temperature
             
-        thickness = lambda p: (c.Rd/(p*g))*findTmoist(thetae0, p)
-        delz_trop = integrate.quad(thickness, p_t, p_BL)[0]
         
-        s_trop = c.cpd*T_t + g*(delz_BL + delz_trop)
-        
-        s_BLtop = c.cpd*T_BLtop + g*delz_BL #dry static energy at top of boundary layer
-        s_surf = c.cpd*T_s #dry static energy at surface
-            
-        s_BL = (s_BLtop + s_surf)/2.
-        
-        s_BL = c.cpd*T_BL + (g*delz_BL)/2.
-            
-        dels_trop = s_BL - s_trop #difference in dry static energy between boundary layer top and tropopause (J)
-            
-        delq = q_sat - q_FA #difference in mixing ratio between sea surface and tropopause
-            
- #dry static energy of BL (well-mixed)
-        #dels_BL = s_BL - s_BLtop #difference in dry static energy between BL and right above BL
-            
-        #K = dels_BL/dels_trop #constant for calculating T_a
-        
-        #T_a = np.mean(findTmoist(thetae0, np.linspace(p_t, p_BL, 100)))
-        
-        #Ta_fn = lambda T_a: eps_a*(eps_BL*sig*T_BL**4 + (1-eps_BL)*sig*T_s**4 - 2*sig*T_a**4)/dels_trop - eps_BL*(eps_a*sig*T_a**4 + sig*T_s**4 - 2*sig*T_BL**4)/(dels_BL)
-        
-        #T_a = fsolve(Ta_fn, 270)
     
-        #T_a = 280
-            
-        #eps_BL = 0.6 #boundary layer emissivity (CALCULATE THIS)
         
-        #effective emission temperature of troposphere (K)
-        #this was derived using the constraint that omega_BL driven by cooling in troposphere must be
-        #equal to omega_BL driven by cooling in boundary layer
-        #FIX THIS
-        #T_a = ((eps_BL*T_BL**4*(K+2) + T_s**4*(K*(1-eps_BL) - eps_BL))/(eps_BL + 2*K))**0.25
-        #T_a = 270
+   
         
-        #eps_BL = eps_a*(2*T_a**4 - T_s**4)/(T_BL**4*(eps_a - 2*K) - T_s**4*(eps_a + K) - eps_a*K*T_a**4)
-            
-        #radiative warming rate in dry region interior (K s^-1)
-        #W_d = (eps_BL*sig*T_BL**4 + (1 - eps_BL)*sig*T_s**4 - 2*sig*T_a**4)/(c.cpd*M_trop)
         
-        #Q_dtrop = eps_a*(eps_BL*sig*T_BL**4 + (1 - eps_BL)*sig*T_s**4 - 2*sig*T_a**4)
-        
-        dheatrate=-1 #prescribed heating rate in moist region interior K/day
-        Q_dtrop = (c.cpd*M_trop*dheatrate)/(86400)
-            
-        #radiative warming rate of moist region interior (K s^-1)
-        #W_m = (S - sig*T_c**4)/(c.cpd*M_trop)
-        #Q_mtrop = (S - sig*T_c**4)
-        mheatrate=-0.6#prescribed heating rate in moist region interior K/day
-        Q_mtrop = (c.cpd*M_trop*mheatrate)/(86400)
-        
-        #radiative warming rate of dry region boundary layer (K s^-1)
-        #W_BL = (eps_BL*sig*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4)/(c.cpd*M_BL)
-        #Q_dBL = (eps_BL*sig**eps_a*T_a**4 + eps_BL*sig*T_s**4 - 2*eps_BL*sig*T_BL**4)
-        
-        #vertical velocity in dry region
-        omega_BL = (g*Q_dtrop)/(dels_trop)
-        
-        w_BL = omega_BL/(-rho_BL*g) 
-        
-        delp_BL = p_s - p_BL
-        
-        u_BL = -(omega_BL/(2*delp_BL))*((l_d**2 - r**2))/r
-        
-        p_d = (rho_BL/8)*(omega_BL/delp_BL)**2*(r**4 - l_d**4)/r**2
-        
-        p_m = -(rho_BL/8)*(omega_BL/delp_BL)**2*(r**2)
-        
-        #f = 0.7
+        #f = 0.90
         
         #solve nonlinear equation for f and l_m 
         
         def equations(p):
-            l_m, f = p
+            l_m, q_BLc, T_BLc = p
             #p_LCL, T_LCL = findLCL0(f*q_sat, p_s, T_BL)
             #p_LCL = p_BL
+            #T_BLc = T_s
+            q_sat = wsatnew(T_BLc, p_s)
+            q_BLc_test = wsatnew(T_s, p_s) + (2*zhat*(q_FA - wsatnew(T_s,p_s)))/(l_d**2 - l_m**2)*(l_m + zhat - (zhat + l_d)*np.exp((l_m - l_d)/zhat))
+            #q_sat = wsat(T_BLc, p_BL)
+            dels_tropc = c.cpd*(T_BLc-T_t) + g*(-delz_trop)
+            #coef = (omega_BL/(2*delp_BL))**2  
+            l_m_test = ((omega_BL*l_d**2)/(omega_BL - (g*Q_mtrop)/(dels_tropc + (1+ alpha/(1-alpha))*L_v*(q_BLc -  q_FA))))**(0.5)
+            thetav_test = theta_v(l_m,l_d)
+
+            T_BLc_test = thetav_to_T(thetav_test,q_BLc)
+            #q_BLm_test = q_sat + (2*zhat*(q_FA - q_sat))/(l_do*2 - l_m**2)*(l_m + zhat - (zhat + l_d)*np.exp((l_m - l_d)/zhat))
             #T_LCL = T_BLtop
             #T_LCL = findTmoist(thetae0, p_LCL)
             #delz_LCL = integrate.quad(thickness, p_t, p_LCL)[0]
             #dels_LCL = c.cpd*(T_LCL-T_t) + g*(-delz_LCL)
-            return (l_m - ((omega_BL*l_d**2)/(omega_BL - (g*Q_mtrop)/(dels_trop + (1+ alpha/(1-alpha))*L_v*(f*q_sat -  q_FA))))**(0.5), \
-                (f-1)*q_sat - (2*zhat*(q_FA - q_sat))/(l_d**2 - l_m**2)*(l_m + zhat - (zhat + l_d)*np.exp((l_m - l_d)/zhat)))
+            return (l_m - l_m_test, \
+                q_BLc_test - q_BLc, \
+                T_BLc - T_BLc_test)
+            
+    
+        #l_m, f, T_BLc = fsolve(equations, [200e3, 0.9, 300], maxfev=100000000, xtol=1e-10)
+        l_m, f, T_BLc = fsolve(equations, [1500e3, 0.02, 310], maxfev=100000000, xtol=1e-10)
+        
+        
+        print 'l_m', l_m/1000
+        print 'T_BLc', T_BLc
+        print 'q_BLc', f*q_sat
+        
+
+        
+        p_0 = p_s
+        c_D = 0.001
+        
+        p_LCL = p_BL
         
     
-        l_m, f = fsolve(equations, [100e3, 0.99], maxfev=1000000, xtol=1e-16)
-        
+        #T_BLc = T_s
+        #PI_s = (p_s/p_0)**(c.Rd/c.cpd)
+        #PI_BL = (p_BL/p_0)**(c.Rd/c.cpd)
         #p_LCL, T_LCL = findLCL0(f*q_sat, p_s, T_BL)
         #T_LCL = findTmoist(thetae0, p_LCL)
-        p_LCL = p_BL
-        T_LCL = T_BLtop
+        #delz_trop = integrate.quad(thickness, p_t, p_BL)[0]
+        #dels_trop = c.cpd*(T_BLc-T_t) + g*(-delz_trop)
+        dels_tropc = c.cpd*(T_BLc-T_t) + g*(-delz_trop)
+        #omega_BL = (g*Q_dtrop)/dels_trop
+        #coef = (omega_BL/(2*delp_BL))**2  
+        #exner = 2/(PI_s - PI_BL)
+      
+        q_BLm = f*q_sat
+        
+            
+        q_BL = q_sat + 2*zhat*(q_FA - q_sat)/(l_d**2 - r**2)*(r + zhat - (zhat + l_d)*np.exp((r - l_d)/zhat))
+        u_BL = -(omega_BL/(2*delp_BL))*((l_d**2 - r**2))/r
+        
+        #theta_BLc = T_BLc*(1+0.61*q_BLm)
+
+        #f = q_BLm/wsat(T_BLc, p_BL)
+        
+        #T_BLc = T_s + coef*(-0.5*(2*l_d**2 - (l_d**4 + l_m**4)/l_m**2) + (c_D/delz_BL)*((-8/3)*l_d**3 + (l_d**4 + 2*l_m**2*l_d**2 - (1/3)*l_m**4)/l_m))
         #delz_LCL = integrate.quad(thickness, p_t, p_LCL)[0]
         #dels_LCL = c.cpd*(T_LCL-T_t) + g*(-delz_LCL)
         
+        #print 'T_BLc', T_BLc
+        
         #l_m = l_mfn(f)
-            
-        l_mi = np.where(r > l_m)[0][0]
+    
+        if r.max() > l_m:    
+            l_mi = np.where(r > l_m)[0][0]
+        else:
+            l_mi= 0
         
         #M_LCL = (p_LCL - p_t)/g  #mass of convective region (from LCL to tropopause) in kg m^-2
         
         #W_m = Q_mtrop/(c.cpd*M_LCL)
         #W_d = Q_dtrop/(c.cpd*M_trop)
+        
+        delqv_trop = f*q_sat - q_FA
             
-        omega_m = (g*Q_mtrop)/(dels_trop + (1+ alpha/(1-alpha))*L_v*(f*q_sat - q_FA))
+        omega_m = (g*Q_mtrop)/(dels_tropc + (1+ alpha/(1-alpha))*L_v*(delqv_trop))
         w_m = -omega_m/(rho_BL*g)
         
         w_BL = -omega_BL/(rho_BL*g)
@@ -267,9 +371,9 @@ for v, alpha in enumerate(alphas):
         
         u_m = omega_m/(2*delp_BL)*r
         
-        q_BLm = f*q_sat
+        #q_BLm = f*q_sat
         
-        delqv_trop = q_BLm - q_FA
+
         
         q_BL[:l_mi] = q_BLm
         u_BL[:l_mi] = u_m[:l_mi]
@@ -280,7 +384,7 @@ for v, alpha in enumerate(alphas):
         M_o = rho_w*delz_o
         
         moist_warming = (Q_mtrop + L_v*P)*l_m**2
-        dry_cooling = -Q_dtrop*(l_d**2 - l_m**2)
+        dry_cooling = -Q_dtrop*(l_d**2 - l_m**2)*(dels_tropc/dels_tropd)
         
         
             
@@ -297,15 +401,18 @@ for v, alpha in enumerate(alphas):
         l_ds[j] = l_d
         q_BLms[j] = q_BLm
         w_ms[j] = w_m
+        T_BLcs[j] = T_BLc
+        theta_BLcs[j] = T_BLc*(1+0.61*q_BLm)
+        p_BLcs[j] = p(l_m,l_d)
         omega_ms[j] = omega_m
         Ps[j] = (P*3600*24*1000)/rho_w
-        RHs[j] = q_BLm/q_sat
-        delhs[j] = dels_trop + L_v*delqv_trop
+        RHs[j] = q_BLm/wsat(T_BLc, p_s)
+        delhs[j] = dels_tropc + L_v*delqv_trop
         delhseff[j] = delhs[j] + ((L_v*alpha)/(1-alpha))*delqv_trop
         p_LCLs[j] = p_LCL
         
     
-    toplot = waterbalance < 1
+    toplot = np.abs(waterbalance) < 1
     
     l_ds = l_ds[toplot]
     waterbalance = waterbalance[toplot]
@@ -319,10 +426,15 @@ for v, alpha in enumerate(alphas):
     delhseff = delhseff[toplot]
     q_BLms = q_BLms[toplot]
     omega_ms = omega_ms[toplot]
+    T_BLcs = T_BLcs[toplot]
+    p_BLcs = p_BLcs[toplot]
+    theta_BLcs = theta_BLcs[toplot]
     
     delhs = -delhs
     delhseff = -delhseff
+    
     negGMS = delhs <= 0
+    #negGMS = delhs >= 0
     
     
     fmt = '-' if alpha > 0 else '--'
@@ -375,12 +487,14 @@ for v, alpha in enumerate(alphas):
     omegac_sim = -rho_BL*g*wc_sim
     q_BLc_sim = np.array([17.0, 17.6, 18.1])
     RH_c_sim = np.array([89.3, 90.2, 90.3])
+    TBL_c_sim = np.array([0.26, 0.46, 0.53])
     l_c_sim = np.sqrt((sigma_sim*domsize_sim**2)/np.pi)
     delh_sim = np.array([6581, 6338, 5452])
-    P_sim = np.array([81.2, 58.9, 41.2])*(rho_w/1000)*(86400)
+    P_sim = np.array([81.2, 58.9, 41.2])
     alpha_sim = np.array([0.05, 0.07, 0.09])
     colors_sim = ['k', 'r', 'g']
     delheff_sim = delh_sim + (-L_v*q_BLc_sim*1e-3)*(alpha_sim)/(1-alpha_sim)
+    T_BLc_sim = np.array([0.26, 0.46, 0.53])
 
     
     plt.figure(4)
@@ -451,9 +565,52 @@ for v, alpha in enumerate(alphas):
     else:
         plt.savefig(fout + 'wm_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
         
+    plt.figure(7)
+    plt.plot(l_ds/1e3, T_BLcs - T_s, fmt,  color=cplot, label=r'$\alpha$ = {:2.2f}'.format(alpha))
+    #plt.plot(l_ds[negGMS]/1e3, w_ms[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
+    plt.plot(l_ds[negGMS]/1e3, T_BLcs[negGMS] - T_s, fmt,  color='b')
+    #plt.scatter(domsize_sim*(1./np.sqrt(2)), wc_sim, 60, marker='x', c=colors_sim)
+    if alpha > 0:
+        plt.plot(l_ds[negGMS][0]/1e3, T_BLcs[negGMS][0] - T_s, '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$\Delta T_{BL,c}$ (K)', fontsize=34)
+    #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
+    if v == end-1:
+        plt.plot(domsize_sim[0]*(1./np.sqrt(2)), TBL_c_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
+        plt.plot(domsize_sim[1]*(1./np.sqrt(2)), TBL_c_sim[1], 'x', color=colors_sim[1], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[1]))
+        plt.plot(domsize_sim[2]*(1./np.sqrt(2)), TBL_c_sim[2], 'x', color=colors_sim[2], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[2]))
+        plt.legend(loc='best')
+        plt.xlim(0, domsizes[-1])
+        plt.savefig(fout + 'TBLc_varyalpha{:2.3}.pdf'.format(mheatrate))
+        plt.close()
+    else:
+        plt.savefig(fout + 'TBLc_varyalpha{:2.3}.pdf'.format(mheatrate))
+        
+    plt.figure(8)
+    plt.plot(l_ds/1e3, p_BLcs - p_s, fmt,  color=cplot, label=r'$\alpha$ = {:2.2f}'.format(alpha))
+    #plt.plot(l_ds[negGMS]/1e3, w_ms[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
+    plt.plot(l_ds[negGMS]/1e3, p_BLcs[negGMS] - p_s, fmt,  color='b')
+    #plt.scatter(domsize_sim*(1./np.sqrt(2)), wc_sim, 60, marker='x', c=colors_sim)
+    if alpha > 0:
+        plt.plot(l_ds[negGMS][0]/1e3, p_BLcs[negGMS][0] - p_s, '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$\Delta p_{BL,c}$ (Pa)', fontsize=34)
+    #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
+    if v == end-1:
+        #plt.plot(domsize_sim[0]*(1./np.sqrt(2)), wc_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
+        #plt.plot(domsize_sim[1]*(1./np.sqrt(2)), wc_sim[1], 'x', color=colors_sim[1], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[1]))
+        #plt.plot(domsize_sim[2]*(1./np.sqrt(2)), wc_sim[2], 'x', color=colors_sim[2], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[2]))
+        #plt.legend(loc='best')
+        plt.xlim(0, domsizes[-1])
+        plt.savefig(fout + 'pBLc_varyalpha{:2.3}.pdf'.format(mheatrate))
+        plt.close()
+    else:
+        plt.savefig(fout + 'pBLc_varyalpha{:2.3}.pdf'.format(mheatrate))
+        
+        
 
 
-    fig=plt.figure(7)
+    fig=plt.figure(9)
     ax1= fig.gca()
     #if flag:
     #    ax1 = fig.gca()
@@ -499,7 +656,7 @@ for v, alpha in enumerate(alphas):
     else:
         plt.savefig(fout + 'qBLm_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
 
-    plt.figure(8)
+    plt.figure(10)
     plt.plot(l_ds/1e3, Ps, fmt,  color=cplot, label=r'$\alpha$ = {:2.2f}'.format(alpha))
     #plt.plot(l_ds[negGMS]/1e3, Ps[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
     plt.plot(l_ds[negGMS]/1e3, Ps[negGMS], fmt,  color='b')
@@ -509,7 +666,20 @@ for v, alpha in enumerate(alphas):
     plt.ylabel(r'$P$ (mm/day)', fontsize=34)
     #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
     if v == end-1:
-        plt.legend(loc='best')
+        #label=r'$\Delta h_{trop} < 0$'
+        #hs = hs + [h2]
+        #labels = labels + [label]
+        label='{:d} km'.format(domsize_sim[0])
+        labels = labels + [label]
+        label='{:d} km'.format(domsize_sim[1])
+        labels = labels + [label]
+        label='{:d} km'.format(domsize_sim[2])
+        labels = labels + [label]
+        h1, = plt.plot(domsize_sim[0]*(1./np.sqrt(2)), P_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3)
+        h2, = plt.plot(domsize_sim[1]*(1./np.sqrt(2)), P_sim[1], 'x', color=colors_sim[1], markersize=10, mew=3)
+        h3, = plt.plot(domsize_sim[2]*(1./np.sqrt(2)), P_sim[2], 'x', color=colors_sim[2], markersize=10, mew=3)
+        hs = hs + [h1, h2, h3]
+        ax1.legend(hs, labels, loc=0)
         plt.xlim(0, domsizes[-1])
         plt.savefig(fout + 'P_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
         plt.close()
@@ -518,7 +688,7 @@ for v, alpha in enumerate(alphas):
         plt.savefig(fout + 'P_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
 
     
-    plt.figure(9)
+    plt.figure(11)
     plt.plot(l_ds/1e3, delhs, fmt,  color=cplot, label=r'$\alpha$ = {:2.2f}'.format(alpha))
     #plt.plot(l_ds[negGMS]/1e3, delhs[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
     plt.plot(l_ds[negGMS]/1e3, delhs[negGMS], fmt,  color='b')
@@ -533,14 +703,14 @@ for v, alpha in enumerate(alphas):
         plt.plot(domsize_sim[1]*(1./np.sqrt(2)), delh_sim[1], 'x', color=colors_sim[1], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[1]))
         plt.plot(domsize_sim[2]*(1./np.sqrt(2)), delh_sim[2], 'x', color=colors_sim[2], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[2]))
         plt.legend(loc='best')
-        plt.axhline(0, color='b', alpha=0.9)
+        plt.axhline(0, color='k', linewidth=1)
         plt.xlim(0, domsizes[-1])
         plt.savefig(fout + 'deltah_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
         plt.close()
     else:
         plt.savefig(fout + 'deltah_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
         
-    plt.figure(10)
+    plt.figure(12)
     plt.plot(l_ds/1e3, delhseff, fmt,  color=cplot, label=r'$\alpha$ = {:2.2f}'.format(alpha))
     #plt.plot(l_ds[negGMS]/1e3, delhseff[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
     plt.plot(l_ds[negGMS]/1e3, delhseff[negGMS], fmt,  color='b')
@@ -554,7 +724,7 @@ for v, alpha in enumerate(alphas):
         plt.plot(domsize_sim[1]*(1./np.sqrt(2)), delheff_sim[1], 'x', color=colors_sim[1], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[1]))
         plt.plot(domsize_sim[2]*(1./np.sqrt(2)), delheff_sim[2], 'x', color=colors_sim[2], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[2]))
         plt.legend(loc='best')
-        plt.axhline(0, color='b', alpha=0.9)
+        plt.axhline(0, color='k', linewidth=1)
         plt.xlim(0, domsizes[-1])
         plt.savefig(fout + 'deltaheff_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
         plt.close()
@@ -562,7 +732,7 @@ for v, alpha in enumerate(alphas):
     else:
         plt.savefig(fout + 'deltaheff_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
         
-    plt.figure(11)
+    plt.figure(13)
     plt.plot(l_ds/1e3, RHs*100, fmt,  color=cplot, label=r'$\alpha$ = {:2.2f}'.format(alpha))
     #plt.plot(l_ds[negGMS]/1e3, RHs[negGMS]*100, fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
     plt.plot(l_ds[negGMS]/1e3, RHs[negGMS]*100, fmt,  color='b')
@@ -584,9 +754,9 @@ for v, alpha in enumerate(alphas):
     else:
         plt.savefig(fout + 'RH_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
         
-    GMS = -omega_ms*delhs
+    GMS = w_ms*delhs
         
-    plt.figure(12)
+    plt.figure(14)
     plt.plot(l_ds/1e3, GMS, fmt,  color=cplot, label=r'$\alpha$ = {:2.2f}'.format(alpha))
     #plt.plot(l_ds[negGMS]/1e3, delhs[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
     plt.plot(l_ds[negGMS]/1e3, GMS[negGMS], fmt,  color='b')
@@ -601,12 +771,59 @@ for v, alpha in enumerate(alphas):
         # plt.plot(domsize_sim[1]*(1./np.sqrt(2)), delh_sim[1], 'x', color=colors_sim[1], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[1]))
         # plt.plot(domsize_sim[2]*(1./np.sqrt(2)), delh_sim[2], 'x', color=colors_sim[2], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[2]))
         plt.legend(loc='best')
-        plt.axhline(0, color='b', alpha=0.9)
+        plt.axhline(0, color='k', linewidth=1)
         plt.xlim(0, domsizes[-1])
         plt.savefig(fout + 'GMS_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
         plt.close()
     else:
         plt.savefig(fout + 'GMS_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
+        
+    plt.figure(15)
+    plt.plot(l_ds/1e3, theta_BLcs - T_s, fmt,  color=cplot, label=r'$\alpha$ = {:2.2f}'.format(alpha))
+    #plt.plot(l_ds[negGMS]/1e3, delhs[negGMS], fmt,  color='b', label=r'$\Delta h_{trop} < 0$'if v == end - 1 else '')
+    plt.plot(l_ds[negGMS]/1e3, theta_BLcs[negGMS] - T_s, fmt,  color='b')
+    #plt.scatter(domsize_sim*(1./np.sqrt(2)), delh_sim, 60, marker='x', c=colors_sim)
+    if alpha > 0:
+        plt.plot(l_ds[negGMS][0]/1e3, theta_BLcs[negGMS][0] - T_s, '.', color ='b', markersize = 20, mew=3)
+    plt.xlabel(r'$l_d$ (km)', fontsize=34)
+    plt.ylabel(r'$\Delta \theta_{BL,c}$ (K)', fontsize=34)
+    #plt.title(r'$Q_{{d,net,trop}}$ = {:2.1f} K/day, $Q_{{c,net,trop}}$ = {:2.3f} K/day'.format(dheatrate, mheatrate))
+    if v == end-1:
+        # plt.plot(domsize_sim[0]*(1./np.sqrt(2)), delh_sim[0], 'x', color=colors_sim[0], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[0]))
+        # plt.plot(domsize_sim[1]*(1./np.sqrt(2)), delh_sim[1], 'x', color=colors_sim[1], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[1]))
+        # plt.plot(domsize_sim[2]*(1./np.sqrt(2)), delh_sim[2], 'x', color=colors_sim[2], markersize=10, mew=3, label='{:d} km'.format(domsize_sim[2]))
+        plt.legend(loc='best')
+        #plt.axhline(0, color='b', alpha=0.9)
+        plt.xlim(0, domsizes[-1])
+        plt.savefig(fout + 'thetaBLc_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
+        plt.close()
+    else:
+        plt.savefig(fout + 'thetaBLc_varyalpha_Qm{:2.3}.pdf'.format(mheatrate))
+        
+        
+r_test = np.linspace(600e3,2000e3,100)   
+
+ps = np.zeros(r_test.shape)
+Ts = np.zeros(r_test.shape)
+
+for j,r in enumerate(r_test):
+    ps[j] = p(r,2000e3)
+    Ts[j] = theta_v(r,2000e3)
+    
+fig=plt.figure(figsize=(16,14))
+#fig.tight_layout()
+plt.plot(r_test/1e3, (ps-p_s))
+plt.xlabel('r (km)')
+plt.ylabel('$\Delta p$ (Pa)')
+plt.savefig(fout + 'deltap_vs_r.png')
+
+fig=plt.figure(figsize=(16,14))
+#fig.tight_layout()
+plt.plot(r_test/1e3, Ts-T_s)
+plt.xlabel('r (km)')
+plt.ylabel('$\Delta T$ (K)')
+plt.savefig(fout + 'deltaT_vs_r.png')        
+
 
     
     # plt.figure(11)
